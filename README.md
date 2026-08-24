@@ -29,13 +29,7 @@ npm run typecheck  # tsc --noEmit
 > semilla: 3 barberos (John, Alex, Mateo), 5 servicios, la configuración de la
 > agenda y el usuario administrador.
 
-### Credenciales de prueba
 
-| Usuario | Contraseña |
-| ------- | ---------- |
-| `admin` | `admin`    |
-
-Entrada: `/login` → redirige a `/admin`.
 
 ---
 
