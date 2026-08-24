@@ -1,0 +1,449 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+
+import { BarberAvatar } from '@/components/ui/BarberAvatar';
+import { api } from '@/lib/api-client';
+import { BRAND, whatsappLink } from '@/lib/brand';
+import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
+import type {
+  Barber,
+  Service,
+  Settings,
+  Slot,
+  SlotInterval,
+} from '@/lib/types';
+
+import { Calendar } from './Calendar';
+import { DurationPills } from './DurationPills';
+import { SlotGrid } from './SlotGrid';
+
+interface BookingWidgetProps {
+  barbers: Barber[];
+  services: Service[];
+  settings: Settings;
+  selectedBarberId: string;
+  onSelectBarber: (barberId: string) => void;
+}
+
+interface Confirmation {
+  barberName: string;
+  date: string;
+  time: string;
+  durationMin: number;
+}
+
+export function BookingWidget({
+  barbers,
+  services,
+  settings,
+  selectedBarberId,
+  onSelectBarber,
+}: BookingWidgetProps) {
+  const [date, setDate] = useState<string>(todayIso());
+  const [durationMin, setDurationMin] = useState<number>(settings.slotIntervalMin);
+  const [serviceId, setServiceId] = useState<string>('');
+  const [time, setTime] = useState<string | null>(null);
+
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+
+  const [customerName, setCustomerName] = useState<string>('');
+  const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [customerEmail, setCustomerEmail] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+
+  const selectedService = useMemo<Service | undefined>(
+    () => services.find((item) => item.id === serviceId),
+    [services, serviceId],
+  );
+
+  const selectedBarber = useMemo<Barber | undefined>(
+    () => barbers.find((item) => item.id === selectedBarberId),
+    [barbers, selectedBarberId],
+  );
+
+  const loadSlots = useCallback(async (): Promise<void> => {
+    if (!selectedBarberId) return;
+
+    setLoadingSlots(true);
+    setError(null);
+
+    try {
+      const result = await api.availability({
+        date,
+        barberId: selectedBarberId,
+        duration: durationMin,
+      });
+      setSlots(result.slots);
+    } catch (cause) {
+      setSlots([]);
+      setError(cause instanceof Error ? cause.message : 'Error al cargar horarios');
+    } finally {
+      setLoadingSlots(false);
+    }
+  }, [date, selectedBarberId, durationMin]);
+
+  useEffect(() => {
+    void loadSlots();
+  }, [loadSlots]);
+
+  // Al cambiar fecha, barbero o duración, la hora elegida deja de ser válida.
+  useEffect(() => {
+    setTime(null);
+  }, [date, selectedBarberId, durationMin]);
+
+  const handleServiceChange = (nextId: string): void => {
+    setServiceId(nextId);
+    const service = services.find((item) => item.id === nextId);
+    if (service) setDurationMin(service.durationMin);
+  };
+
+  const handleDurationChange = (minutes: SlotInterval): void => {
+    setDurationMin(minutes);
+    // Si el servicio elegido ya no coincide con la duración, se deselecciona.
+    if (selectedService && selectedService.durationMin !== minutes) {
+      setServiceId('');
+    }
+  };
+
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
+    event.preventDefault();
+    if (!time || !selectedBarber || !serviceId) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await api.appointments.create({
+        barberId: selectedBarberId,
+        serviceId,
+        date,
+        time,
+        durationMin,
+        customerName,
+        customerPhone,
+        customerEmail,
+        notes,
+      });
+
+      setConfirmation({
+        barberName: selectedBarber.name,
+        date,
+        time,
+        durationMin,
+      });
+      setTime(null);
+      setNotes('');
+      await loadSlots();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No pudimos reservar');
+      await loadSlots();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const canSubmit =
+    Boolean(time) &&
+    Boolean(selectedBarberId) &&
+    Boolean(serviceId) &&
+    customerName.trim().length >= 2 &&
+    customerPhone.replace(/\D/g, '').length >= 8 &&
+    !submitting;
+
+  return (
+    <section
+      id="agenda"
+      aria-labelledby="agenda-title"
+      className="border-t border-gray-100 bg-gray-50 py-24 lg:py-32"
+    >
+      <div className="container-page">
+        <div className="max-w-xl">
+          <p className="eyebrow">Reservas</p>
+          <h2 id="agenda-title" className="section-title mt-3">
+            Elegí tu turno
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-ink-soft">
+            Seleccioná barbero, servicio y horario. Los bloques se generan
+            automáticamente cada {settings.slotIntervalMin} minutos entre las{' '}
+            {settings.openingTime} y las {settings.closingTime}.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          {/* Columna izquierda: calendario mensual */}
+          <aside
+            aria-label="Selección de fecha"
+            className="card h-fit p-6 sm:p-8"
+          >
+            <Calendar
+              value={date}
+              onChange={setDate}
+              workingDays={settings.workingDays}
+            />
+
+            <div className="mt-8 border-t border-gray-100 pt-6">
+              <DurationPills value={durationMin} onChange={handleDurationChange} />
+            </div>
+          </aside>
+
+          {/* Columna derecha: barbero, servicio, slots y datos */}
+          <div className="card p-6 sm:p-8">
+            <fieldset>
+              <legend className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+                Barbero
+              </legend>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {barbers.map((barber) => {
+                  const active = barber.id === selectedBarberId;
+                  return (
+                    <button
+                      key={barber.id}
+                      type="button"
+                      onClick={() => onSelectBarber(barber.id)}
+                      aria-pressed={active}
+                      className={`flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-4 text-sm font-semibold transition-all duration-200 ${
+                        active
+                          ? 'border-brand bg-brand text-white shadow-brand'
+                          : 'border-gray-200 bg-white text-ink hover:border-ink'
+                      }`}
+                    >
+                      <BarberAvatar
+                        name={barber.name}
+                        photoUrl={barber.photoUrl}
+                        size={28}
+                        className="ring-0"
+                      />
+                      {barber.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div className="mt-7">
+              <label
+                htmlFor="service"
+                className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted"
+              >
+                Servicio
+              </label>
+              <select
+                id="service"
+                required
+                aria-required="true"
+                value={serviceId}
+                onChange={(event) => handleServiceChange(event.target.value)}
+                className="mt-3"
+              >
+                <option value="" disabled>
+                  Elegí un servicio…
+                </option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name} — {formatDuration(service.durationMin)} —{' '}
+                    {formatPrice(service.price)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-7 border-t border-gray-100 pt-7">
+              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-bold text-ink">
+                  {formatLongDate(date)}
+                </h3>
+                <span className="text-xs text-ink-muted">
+                  Bloques de {formatDuration(durationMin)}
+                </span>
+              </div>
+
+              <SlotGrid
+                slots={slots}
+                value={time}
+                onChange={setTime}
+                loading={loadingSlots}
+              />
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-7 border-t border-gray-100 pt-7">
+              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+                Tus datos
+              </h3>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="name" className="sr-only">
+                    Nombre y apellido
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    required
+                    autoComplete="name"
+                    placeholder="Nombre y apellido"
+                    value={customerName}
+                    onChange={(event) => setCustomerName(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="phone" className="sr-only">
+                    Teléfono
+                  </label>
+                  <input
+                    id="phone"
+                    type="tel"
+                    required
+                    autoComplete="tel"
+                    placeholder="Teléfono"
+                    value={customerPhone}
+                    onChange={(event) => setCustomerPhone(event.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="email" className="sr-only">
+                    Email (opcional)
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Email (opcional)"
+                    value={customerEmail}
+                    onChange={(event) => setCustomerEmail(event.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="notes" className="sr-only">
+                    Comentarios
+                  </label>
+                  <textarea
+                    id="notes"
+                    rows={2}
+                    placeholder="Comentarios para tu barbero (opcional)"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {error && (
+                  <motion.p
+                    role="alert"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600"
+                  >
+                    {error}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-ink-soft">
+                  {!selectedService ? (
+                    'Elegí un servicio para continuar'
+                  ) : time ? (
+                    <>
+                      <span className="font-semibold text-ink">{time} h</span>{' '}
+                      con {selectedBarber?.name ?? '—'} · {selectedService.name}
+                    </>
+                  ) : (
+                    'Elegí un horario para continuar'
+                  )}
+                </p>
+
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="pill-primary w-full px-8 py-3 sm:w-auto"
+                >
+                  {submitting ? 'Reservando…' : 'Confirmar turno'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmación */}
+      <AnimatePresence>
+        {confirmation && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] grid place-items-center bg-ink/40 p-5 backdrop-blur-sm"
+            onClick={() => setConfirmation(null)}
+          >
+            <motion.article
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl"
+            >
+              <span
+                aria-hidden="true"
+                className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand text-white"
+              >
+                <svg viewBox="0 0 20 20" className="h-7 w-7 fill-current">
+                  <path d="M8.1 13.4 4.7 10l-1.4 1.4 4.8 4.8 8.6-8.6-1.4-1.4z" />
+                </svg>
+              </span>
+
+              <h3
+                id="confirm-title"
+                className="mt-6 text-2xl font-extrabold tracking-[-0.03em] text-ink"
+              >
+                ¡Turno confirmado!
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+                {formatLongDate(confirmation.date)} a las{' '}
+                <strong className="text-ink">{confirmation.time} h</strong> con{' '}
+                <strong className="text-ink">{confirmation.barberName}</strong> ·{' '}
+                {formatDuration(confirmation.durationMin)}.
+              </p>
+              <p className="mt-2 text-xs text-ink-muted">
+                Te esperamos en {BRAND.street}, {BRAND.city}.
+              </p>
+
+              <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+                <a
+                  href={whatsappLink(
+                    `Hola, mi nombre es ${customerName} y reservé un turno el ${confirmation.date} a las ${confirmation.time} con ${confirmation.barberName}.`,
+                  )}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="pill-outline flex-1"
+                >
+                  Avisar por WhatsApp
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setConfirmation(null)}
+                  className="pill-primary flex-1"
+                >
+                  Listo
+                </button>
+              </div>
+            </motion.article>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}

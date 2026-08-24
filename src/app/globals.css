@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: 0 102 255;
+    --header-height: 72px;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--header-height) + 16px);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  ::selection {
+    @apply bg-brand text-white;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-white;
+  }
+
+  /* Inputs base — se reutiliza en formularios públicos y en el panel admin. */
+  input[type='text'],
+  input[type='email'],
+  input[type='tel'],
+  input[type='url'],
+  input[type='password'],
+  input[type='number'],
+  input[type='time'],
+  select,
+  textarea {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-ink
+      placeholder:text-ink-muted focus:border-brand focus:ring-0;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .pill {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm
+      font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .pill-primary {
+    @apply pill bg-brand text-white shadow-brand hover:bg-brand-600 active:scale-[0.98];
+  }
+
+  .pill-outline {
+    @apply pill border border-gray-200 bg-white text-ink hover:border-ink hover:bg-gray-50;
+  }
+
+  .pill-ghost {
+    @apply pill text-ink-soft hover:bg-gray-100 hover:text-ink;
+  }
+
+  .section-title {
+    @apply text-3xl font-extrabold tracking-[-0.03em] text-ink sm:text-4xl;
+  }
+
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.2em] text-brand;
+  }
+
+  .card {
+    @apply rounded-3xl border border-gray-100 bg-white shadow-card;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grayscale-hover {
+    @apply grayscale transition-[filter,transform] duration-500 hover:grayscale-0;
+  }
+
+  /* Barra de scroll fina para la grilla de horarios. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .scroll-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scroll-slim::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-300;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
