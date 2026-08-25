@@ -11,6 +11,7 @@ import type { Barber, Service, Settings } from '@/lib/types';
 
 import { AppointmentsPanel } from './AppointmentsPanel';
 import { BarbersPanel } from './BarbersPanel';
+import { PaymentsPanel } from './PaymentsPanel';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
 import { ServicesPanel } from './ServicesPanel';
 import { UsersPanel } from './UsersPanel';
@@ -22,7 +23,7 @@ interface AdminDashboardProps {
   initialSettings: Settings;
 }
 
-type TabId = 'turnos' | 'barberos' | 'servicios' | 'agenda' | 'usuarios';
+type TabId = 'turnos' | 'barberos' | 'servicios' | 'agenda' | 'usuarios' | 'pagos';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
@@ -30,6 +31,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'servicios', label: 'Servicios' },
   { id: 'agenda', label: 'Configuración' },
   { id: 'usuarios', label: 'Usuarios' },
+  { id: 'pagos', label: 'Pagos' },
 ];
 
 export function AdminDashboard({
@@ -127,6 +129,9 @@ export function AdminDashboard({
               <ScheduleSettingsPanel settings={settings} onChange={setSettings} />
             )}
             {tab === 'usuarios' && <UsersPanel barbers={barbers} />}
+            {tab === 'pagos' && (
+              <PaymentsPanel settings={settings} onChange={setSettings} />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>

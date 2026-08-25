@@ -12,6 +12,7 @@ interface SettingsBody {
   closingTime?: string;
   workingDays?: number[];
   bufferMin?: number;
+  depositAmount?: number;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -68,6 +69,13 @@ export async function PUT(request: Request): Promise<NextResponse> {
   }
   if (Number.isFinite(Number(body.bufferMin))) {
     patch.bufferMin = Math.max(0, Math.round(Number(body.bufferMin)));
+  }
+  if (body.depositAmount !== undefined) {
+    const value = Number(body.depositAmount);
+    if (!Number.isFinite(value) || value < 0) {
+      return NextResponse.json({ error: 'Seña inválida' }, { status: 400 });
+    }
+    patch.depositAmount = Math.round(value);
   }
 
   const settings = await updateSettings(patch);

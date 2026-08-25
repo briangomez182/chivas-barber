@@ -362,13 +362,16 @@ export function BookingWidget({
                     ? 'Redirigiendo a Mercado Pago…'
                     : submitting
                       ? 'Preparando el pago…'
-                      : 'Pagar y confirmar turno'}
+                      : 'Pagar seña y confirmar turno'}
                 </button>
               </div>
 
               <p className="mt-3 text-xs text-ink-muted">
-                Al confirmar vas a ser redirigido a Mercado Pago para pagar{' '}
-                {selectedService ? formatPrice(selectedService.price) : 'el servicio'}
+                Al confirmar vas a ser redirigido a Mercado Pago para pagar una
+                seña de {formatPrice(settings.depositAmount)}
+                {selectedService
+                  ? ` (el resto, ${formatPrice(Math.max(selectedService.price - settings.depositAmount, 0))}, se abona en el local)`
+                  : ''}
                 . El turno queda reservado recién cuando el pago se aprueba.
               </p>
             </form>

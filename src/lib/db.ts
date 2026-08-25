@@ -36,6 +36,7 @@ interface SettingsRow {
   closing_time: string;
   working_days: number[];
   buffer_min: number;
+  deposit_amount: number;
 }
 
 interface BarberRow {
@@ -89,6 +90,7 @@ function toSettings(row: SettingsRow): Settings {
     closingTime: row.closing_time,
     workingDays: row.working_days,
     bufferMin: row.buffer_min,
+    depositAmount: row.deposit_amount,
   };
 }
 
@@ -154,7 +156,7 @@ function isMalformedId(error: { code?: string } | null): boolean {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_COLUMNS =
-  'slot_interval_min, opening_time, closing_time, working_days, buffer_min';
+  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount';
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabaseAdmin()
@@ -179,6 +181,7 @@ export interface SettingsPatch {
   closingTime?: string;
   workingDays?: number[];
   bufferMin?: number;
+  depositAmount?: number;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
@@ -190,6 +193,7 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   if (patch.closingTime !== undefined) row.closing_time = patch.closingTime;
   if (patch.workingDays !== undefined) row.working_days = patch.workingDays;
   if (patch.bufferMin !== undefined) row.buffer_min = patch.bufferMin;
+  if (patch.depositAmount !== undefined) row.deposit_amount = patch.depositAmount;
 
   if (Object.keys(row).length === 0) return getSettings();
 

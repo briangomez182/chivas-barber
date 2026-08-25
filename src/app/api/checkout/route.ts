@@ -75,26 +75,31 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const service = body.serviceId ? await getService(body.serviceId) : null;
-  const amount = service?.price ?? 0;
-
-  if (amount <= 0) {
+  if (!service) {
     return NextResponse.json(
       { error: 'Elegí un servicio para poder cobrar el turno' },
       { status: 422 },
     );
   }
 
-  const durationMin = service
-    ? service.durationMin
-    : Number.isFinite(Number(body.durationMin)) && Number(body.durationMin) > 0
-      ? Math.round(Number(body.durationMin))
-      : (await getSettings()).slotIntervalMin;
+  // Se cobra la seña configurada por el admin (Pagos), no el precio del
+  // servicio — el resto se abona en el local.
+  const settings = await getSettings();
+  const amount = settings.depositAmount;
 
+  if (amount <= 0) {
+    return NextResponse.json(
+      { error: 'Todavía no se configuró la seña a cobrar (sección Pagos del panel admin)' },
+      { status: 422 },
+    );
+  }
+
+  const durationMin = service.durationMin;
   const customerEmail = body.customerEmail?.trim() || null;
 
   const result = await bookAppointmentPending({
     barberId,
-    serviceId: service?.id ?? null,
+    serviceId: service.id,
     date,
     time,
     durationMin,
@@ -117,7 +122,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const preference = await createPreference({
       appointmentId: appointment.id,
-      title: `${service?.name ?? 'Turno'} con ${barber.name} · Chivas Barbería Club`,
+      title: `Seña — ${service.name} con ${barber.name} · Chivas Barbería Club`,
       unitPrice: amount,
       payerName: customerName,
       payerEmail: customerEmail,

@@ -60,6 +60,11 @@ export interface Settings {
   workingDays: number[];
   /** Minutos de descanso entre turnos. */
   bufferMin: number;
+  /**
+   * Seña fija en pesos que se cobra por Mercado Pago al reservar (no el
+   * precio total del servicio). El resto se abona en el local.
+   */
+  depositAmount: number;
 }
 
 export interface Appointment {
