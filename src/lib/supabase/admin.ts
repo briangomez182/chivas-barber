@@ -3,15 +3,17 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 /**
  * Cliente de Supabase para uso EXCLUSIVO en el servidor.
  *
- * Usa la `service_role` key, que saltea Row Level Security. Todas las tablas
- * tienen RLS activo y sin policies (ver supabase/schema.sql), así que este es
- * el único camino de acceso a los datos — y por eso la key no puede filtrarse
- * al navegador bajo ninguna circunstancia.
+ * Usa la `service_role` key, que saltea Row Level Security y el Admin API de
+ * Auth (crear/editar usuarios, setear `app_metadata`). Se usa para todo lo
+ * que necesita ver/modificar más allá de lo que le permitiría su propia
+ * sesión a un usuario: el panel de admin, y el booking público anónimo (que
+ * no tiene sesión). Por eso la key no puede filtrarse al navegador bajo
+ * ninguna circunstancia.
  */
 
 if (typeof window !== 'undefined') {
   throw new Error(
-    'lib/supabase.ts sólo puede importarse desde el servidor: expone la service_role key.',
+    'lib/supabase/admin.ts sólo puede importarse desde el servidor: expone la service_role key.',
   );
 }
 
@@ -31,10 +33,10 @@ let client: SupabaseClient | null = null;
  * Se crea de forma perezosa para que un build sin variables de entorno no
  * explote al importar el módulo: sólo falla cuando alguien pide datos.
  */
-export function supabase(): SupabaseClient {
+export function supabaseAdmin(): SupabaseClient {
   if (!client) {
     client = createClient(
-      required('SUPABASE_URL'),
+      required('NEXT_PUBLIC_SUPABASE_URL'),
       required('SUPABASE_SERVICE_ROLE_KEY'),
       {
         auth: { persistSession: false, autoRefreshToken: false },

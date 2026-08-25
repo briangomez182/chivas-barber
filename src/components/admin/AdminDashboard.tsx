@@ -13,6 +13,7 @@ import { AppointmentsPanel } from './AppointmentsPanel';
 import { BarbersPanel } from './BarbersPanel';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
 import { ServicesPanel } from './ServicesPanel';
+import { UsersPanel } from './UsersPanel';
 
 interface AdminDashboardProps {
   adminName: string;
@@ -21,13 +22,14 @@ interface AdminDashboardProps {
   initialSettings: Settings;
 }
 
-type TabId = 'turnos' | 'barberos' | 'servicios' | 'agenda';
+type TabId = 'turnos' | 'barberos' | 'servicios' | 'agenda' | 'usuarios';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
   { id: 'barberos', label: 'Barberos' },
   { id: 'servicios', label: 'Servicios' },
   { id: 'agenda', label: 'Configuración' },
+  { id: 'usuarios', label: 'Usuarios' },
 ];
 
 export function AdminDashboard({
@@ -124,6 +126,7 @@ export function AdminDashboard({
             {tab === 'agenda' && (
               <ScheduleSettingsPanel settings={settings} onChange={setSettings} />
             )}
+            {tab === 'usuarios' && <UsersPanel barbers={barbers} />}
           </motion.div>
         </AnimatePresence>
       </main>

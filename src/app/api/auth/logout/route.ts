@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { SESSION_COOKIE } from '@/lib/session';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-/** POST /api/auth/logout — borra la cookie de sesión. */
+/** POST /api/auth/logout */
 export async function POST(): Promise<NextResponse> {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 });
-  return response;
+  const supabase = await createServerSupabaseClient();
+  await supabase.auth.signOut();
+  return NextResponse.json({ ok: true });
 }

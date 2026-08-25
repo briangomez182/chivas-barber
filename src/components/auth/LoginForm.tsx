@@ -34,8 +34,8 @@ export function LoginForm() {
   };
 
   const fillDemo = (): void => {
-    setEmail('admin');
-    setPassword('admin');
+    setEmail('admin@chivasbarber.club');
+    setPassword('admin123');
   };
 
   return (
@@ -45,14 +45,14 @@ export function LoginForm() {
           htmlFor="email"
           className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted"
         >
-          Usuario o email
+          Email
         </label>
         <input
           id="email"
-          type="text"
+          type="email"
           required
           autoComplete="username"
-          placeholder="admin"
+          placeholder="vos@chivasbarber.club"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="mt-2"
@@ -102,7 +102,7 @@ export function LoginForm() {
         onClick={fillDemo}
         className="pill-ghost w-full text-xs"
       >
-        Usar credenciales de prueba (admin / admin)
+        Usar credenciales de prueba (admin@chivasbarber.club)
       </button>
     </form>
   );

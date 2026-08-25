@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 import { api } from '@/lib/api-client';
-import { formatDuration, formatLongDate, todayIso } from '@/lib/date';
+import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
 import type { Appointment, Barber, Service } from '@/lib/types';
 
 interface AppointmentsPanelProps {
@@ -15,6 +15,7 @@ interface AppointmentsPanelProps {
 const STATUS_STYLES: Record<Appointment['status'], string> = {
   confirmed: 'bg-brand-50 text-brand',
   pending: 'bg-amber-50 text-amber-600',
+  pending_payment: 'bg-orange-50 text-orange-600',
   done: 'bg-emerald-50 text-emerald-600',
   cancelled: 'bg-gray-100 text-ink-muted line-through',
 };
@@ -22,28 +23,46 @@ const STATUS_STYLES: Record<Appointment['status'], string> = {
 const STATUS_LABELS: Record<Appointment['status'], string> = {
   confirmed: 'Confirmado',
   pending: 'Pendiente',
+  pending_payment: 'Esperando pago',
   done: 'Atendido',
   cancelled: 'Cancelado',
 };
 
 export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps) {
   const [date, setDate] = useState<string>(todayIso());
+  const [barberFilter, setBarberFilter] = useState<string>('');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const { appointments: list } = await api.appointments.list(date);
+      const { appointments: list } = await api.appointments.list(
+        date,
+        barberFilter || undefined,
+      );
       setAppointments(list);
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [date, barberFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const reassignBarber = async (
+    appointment: Appointment,
+    barberId: string,
+  ): Promise<void> => {
+    if (barberId === appointment.barberId) return;
+    const { appointment: updated } = await api.appointments.reschedule(appointment.id, {
+      barberId,
+    });
+    setAppointments((current) =>
+      current.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  };
 
   const barberName = (id: string): string =>
     barbers.find((item) => item.id === id)?.name ?? 'Barbero eliminado';
@@ -98,6 +117,22 @@ export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps)
             onChange={(event) => setDate(event.target.value)}
             className="w-auto rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
           />
+          <label htmlFor="filter-barber" className="sr-only">
+            Barbero
+          </label>
+          <select
+            id="filter-barber"
+            value={barberFilter}
+            onChange={(event) => setBarberFilter(event.target.value)}
+            className="w-auto rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+          >
+            <option value="">Todos los barberos</option>
+            {barbers.map((barber) => (
+              <option key={barber.id} value={barber.id}>
+                {barber.name}
+              </option>
+            ))}
+          </select>
           <button type="button" onClick={() => load()} className="pill-outline">
             Actualizar
           </button>
@@ -113,6 +148,7 @@ export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps)
               <th scope="col" className="px-6 py-4">Cliente</th>
               <th scope="col" className="px-6 py-4">Barbero</th>
               <th scope="col" className="px-6 py-4">Servicio</th>
+              <th scope="col" className="px-6 py-4">Pago</th>
               <th scope="col" className="px-6 py-4">Estado</th>
               <th scope="col" className="px-6 py-4 text-right">Acciones</th>
             </tr>
@@ -120,7 +156,7 @@ export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps)
           <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-ink-muted">
+                <td colSpan={7} className="px-6 py-12 text-center text-ink-muted">
                   Cargando turnos…
                 </td>
               </tr>
@@ -128,7 +164,7 @@ export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps)
 
             {!loading && appointments.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-ink-soft">
+                <td colSpan={7} className="px-6 py-12 text-center text-ink-soft">
                   No hay turnos para esta fecha.
                 </td>
               </tr>
@@ -159,11 +195,38 @@ export function AppointmentsPanel({ barbers, services }: AppointmentsPanelProps)
                       {appointment.customerPhone}
                     </a>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-ink-soft">
-                    {barberName(appointment.barberId)}
+                  <td className="whitespace-nowrap px-6 py-4">
+                    <label className="sr-only" htmlFor={`barber-${appointment.id}`}>
+                      Barbero de {appointment.customerName}
+                    </label>
+                    <select
+                      id={`barber-${appointment.id}`}
+                      value={appointment.barberId}
+                      onChange={(event) => reassignBarber(appointment, event.target.value)}
+                      className="w-auto rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-ink-soft"
+                    >
+                      {barbers.map((barber) => (
+                        <option key={barber.id} value={barber.id}>
+                          {barber.name}
+                        </option>
+                      ))}
+                      {!barbers.some((b) => b.id === appointment.barberId) && (
+                        <option value={appointment.barberId}>
+                          {barberName(appointment.barberId)}
+                        </option>
+                      )}
+                    </select>
                   </td>
                   <td className="px-6 py-4 text-ink-soft">
                     {serviceName(appointment.serviceId)}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4">
+                    <p className="font-semibold text-ink">
+                      {appointment.amount !== null ? formatPrice(appointment.amount) : '—'}
+                    </p>
+                    {appointment.paymentStatus && (
+                      <p className="text-xs text-ink-muted">MP: {appointment.paymentStatus}</p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span

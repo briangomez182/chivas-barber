@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { api } from '@/lib/api-client';
-import { BRAND, whatsappLink } from '@/lib/brand';
 import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
 import type {
   Barber,
@@ -27,13 +26,6 @@ interface BookingWidgetProps {
   onSelectBarber: (barberId: string) => void;
 }
 
-interface Confirmation {
-  barberName: string;
-  date: string;
-  time: string;
-  durationMin: number;
-}
-
 export function BookingWidget({
   barbers,
   services,
@@ -49,8 +41,8 @@ export function BookingWidget({
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [redirecting, setRedirecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
@@ -121,7 +113,11 @@ export function BookingWidget({
     setError(null);
 
     try {
-      await api.appointments.create({
+      // Crea el turno en estado "pendiente de pago" y obtiene el link de
+      // Checkout Pro de Mercado Pago. El turno recién queda confirmado
+      // cuando Mercado Pago avisa que el pago fue aprobado — por eso acá no
+      // mostramos ninguna confirmación todavía, sólo redirigimos a pagar.
+      const { checkoutUrl } = await api.checkout({
         barberId: selectedBarberId,
         serviceId,
         date,
@@ -133,19 +129,13 @@ export function BookingWidget({
         notes,
       });
 
-      setConfirmation({
-        barberName: selectedBarber.name,
-        date,
-        time,
-        durationMin,
-      });
-      setTime(null);
-      setNotes('');
-      await loadSlots();
+      setRedirecting(true);
+      window.location.href = checkoutUrl;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No pudimos reservar');
+      setError(
+        cause instanceof Error ? cause.message : 'No pudimos iniciar el pago',
+      );
       await loadSlots();
-    } finally {
       setSubmitting(false);
     }
   };
@@ -156,7 +146,8 @@ export function BookingWidget({
     Boolean(serviceId) &&
     customerName.trim().length >= 2 &&
     customerPhone.replace(/\D/g, '').length >= 8 &&
-    !submitting;
+    !submitting &&
+    !redirecting;
 
   return (
     <section
@@ -367,80 +358,48 @@ export function BookingWidget({
                   disabled={!canSubmit}
                   className="pill-primary w-full px-8 py-3 sm:w-auto"
                 >
-                  {submitting ? 'Reservando…' : 'Confirmar turno'}
+                  {redirecting
+                    ? 'Redirigiendo a Mercado Pago…'
+                    : submitting
+                      ? 'Preparando el pago…'
+                      : 'Pagar y confirmar turno'}
                 </button>
               </div>
+
+              <p className="mt-3 text-xs text-ink-muted">
+                Al confirmar vas a ser redirigido a Mercado Pago para pagar{' '}
+                {selectedService ? formatPrice(selectedService.price) : 'el servicio'}
+                . El turno queda reservado recién cuando el pago se aprueba.
+              </p>
             </form>
           </div>
         </div>
       </div>
 
-      {/* Confirmación */}
+      {/* Overlay mientras se redirige a Mercado Pago */}
       <AnimatePresence>
-        {confirmation && (
+        {redirecting && (
           <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-title"
+            role="status"
+            aria-live="polite"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] grid place-items-center bg-ink/40 p-5 backdrop-blur-sm"
-            onClick={() => setConfirmation(null)}
           >
-            <motion.article
-              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl"
+              className="flex max-w-sm flex-col items-center gap-4 rounded-3xl bg-white p-8 text-center shadow-2xl"
             >
               <span
                 aria-hidden="true"
-                className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand text-white"
-              >
-                <svg viewBox="0 0 20 20" className="h-7 w-7 fill-current">
-                  <path d="M8.1 13.4 4.7 10l-1.4 1.4 4.8 4.8 8.6-8.6-1.4-1.4z" />
-                </svg>
-              </span>
-
-              <h3
-                id="confirm-title"
-                className="mt-6 text-2xl font-extrabold tracking-[-0.03em] text-ink"
-              >
-                ¡Turno confirmado!
-              </h3>
-              <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-                {formatLongDate(confirmation.date)} a las{' '}
-                <strong className="text-ink">{confirmation.time} h</strong> con{' '}
-                <strong className="text-ink">{confirmation.barberName}</strong> ·{' '}
-                {formatDuration(confirmation.durationMin)}.
+                className="h-10 w-10 animate-spin rounded-full border-[3px] border-gray-200 border-t-brand"
+              />
+              <p className="text-sm font-semibold text-ink">
+                Te estamos redirigiendo a Mercado Pago para completar el pago…
               </p>
-              <p className="mt-2 text-xs text-ink-muted">
-                Te esperamos en {BRAND.street}, {BRAND.city}.
-              </p>
-
-              <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-                <a
-                  href={whatsappLink(
-                    `Hola, mi nombre es ${customerName} y reservé un turno el ${confirmation.date} a las ${confirmation.time} con ${confirmation.barberName}.`,
-                  )}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="pill-outline flex-1"
-                >
-                  Avisar por WhatsApp
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setConfirmation(null)}
-                  className="pill-primary flex-1"
-                >
-                  Listo
-                </button>
-              </div>
-            </motion.article>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

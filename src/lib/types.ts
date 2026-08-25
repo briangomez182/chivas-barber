@@ -7,8 +7,25 @@
 export const SLOT_INTERVALS = [15, 30, 45, 60] as const;
 export type SlotInterval = (typeof SLOT_INTERVALS)[number];
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'done';
-export type UserRole = 'admin' | 'client';
+export type AppointmentStatus =
+  | 'pending'
+  | 'pending_payment'
+  | 'confirmed'
+  | 'cancelled'
+  | 'done';
+export type UserRole = 'admin' | 'editor' | 'client';
+
+/** Estados de pago tal como los reporta la API de Mercado Pago. */
+export type PaymentStatus =
+  | 'pending'
+  | 'approved'
+  | 'authorized'
+  | 'in_process'
+  | 'in_mediation'
+  | 'rejected'
+  | 'cancelled'
+  | 'refunded'
+  | 'charged_back';
 
 export interface Barber {
   id: string;
@@ -59,16 +76,27 @@ export interface Appointment {
   customerEmail: string | null;
   notes: string | null;
   status: AppointmentStatus;
+  /** Precio del servicio al momento de la reserva (congelado). */
+  amount: number | null;
+  /** ID de pago de Mercado Pago, una vez que existe un intento de cobro. */
+  paymentId: string | null;
+  /** Último estado de pago reportado por el webhook de Mercado Pago. */
+  paymentStatus: PaymentStatus | null;
   createdAt: string;
 }
 
-export interface User {
+/**
+ * Perfil de `public.profiles`, 1:1 con un `auth.users` de Supabase Auth.
+ * `email` sale de `auth.users` (Admin API), no de `profiles`.
+ */
+export interface Profile {
   id: string;
-  name: string;
   email: string;
+  name: string;
   phone: string;
-  passwordHash: string;
   role: UserRole;
+  /** Barbero vinculado — sólo tiene sentido para `role: 'editor'`. */
+  barberId: string | null;
   createdAt: string;
 }
 
@@ -82,12 +110,13 @@ export interface Slot {
   reason?: 'taken' | 'past' | 'closed';
 }
 
-/** Sesión mínima almacenada en la cookie firmada. */
-export interface SessionPayload {
-  sub: string;
+/** Sesión resuelta desde Supabase Auth + el profile del usuario. */
+export interface Session {
+  id: string;
+  email: string;
   name: string;
   role: UserRole;
-  exp: number;
+  barberId: string | null;
 }
 
 /** Respuesta estándar de error de las API Routes. */

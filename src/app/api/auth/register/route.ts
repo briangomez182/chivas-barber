@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { createUser } from '@/lib/db';
-import { hashPassword } from '@/lib/password';
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from '@/lib/session';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 interface RegisterBody {
   name?: string;
@@ -11,7 +9,13 @@ interface RegisterBody {
   password?: string;
 }
 
-/** POST /api/auth/register — alta de clientes. */
+/**
+ * POST /api/auth/register — alta de clientes.
+ *
+ * `signUp` no manda `app_metadata`, así que el trigger `handle_new_user`
+ * siempre crea el profile con `role: 'client'` (ver migración RBAC) — no hay
+ * forma de que este endpoint dé de alta un admin/editor.
+ */
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json().catch(() => ({}))) as RegisterBody;
 
@@ -33,48 +37,40 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const passwordHash = await hashPassword(password);
+  const supabase = await createServerSupabaseClient();
 
-  const result = await createUser({
-    name,
+  const { data, error } = await supabase.auth.signUp({
     email,
-    phone,
-    passwordHash,
-    role: 'client',
+    password,
+    options: { data: { name, phone } },
   });
 
-  if ('error' in result) {
+  if (error) {
+    if (error.code === 'user_already_exists') {
+      return NextResponse.json(
+        { error: 'Ya existe una cuenta con ese email' },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  // Si el proyecto tiene "Confirm email" activado en Supabase Auth, `signUp`
+  // no devuelve sesión hasta que el usuario confirme el link que le llega
+  // por mail — acá se lo avisamos al frontend en vez de asumir que ya puede
+  // entrar.
+  if (!data.session) {
     return NextResponse.json(
-      { error: 'Ya existe una cuenta con ese email' },
-      { status: 409 },
+      {
+        user: { id: data.user?.id, name, email },
+        needsEmailConfirmation: true,
+      },
+      { status: 201 },
     );
   }
 
-  const token = await signSession({
-    sub: result.user.id,
-    name: result.user.name,
-    role: result.user.role,
-  });
-
-  const response = NextResponse.json(
-    {
-      user: {
-        id: result.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        role: result.user.role,
-      },
-    },
+  return NextResponse.json(
+    { user: { id: data.user!.id, name, email, role: 'client' } },
     { status: 201 },
   );
-
-  response.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE,
-    secure: process.env.NODE_ENV === 'production',
-  });
-
-  return response;
 }

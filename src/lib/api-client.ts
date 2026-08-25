@@ -1,11 +1,24 @@
 import type {
   Appointment,
   Barber,
+  Profile,
   Service,
-  SessionPayload,
+  Session,
   Settings,
   Slot,
 } from './types';
+
+interface TrackedAppointment {
+  id: string;
+  date: string;
+  time: string;
+  durationMin: number;
+  status: Appointment['status'];
+  paymentStatus: string | null;
+  amount: number | null;
+  barberName: string | null;
+  serviceName: string | null;
+}
 
 /** Wrapper `fetch` tipado para los componentes cliente. */
 export async function apiFetch<T>(
@@ -92,10 +105,15 @@ export const api = {
     );
   },
   appointments: {
-    list: (date?: string) =>
-      apiFetch<{ appointments: Appointment[] }>(
-        `/api/appointments${date ? `?date=${date}` : ''}`,
-      ),
+    list: (date?: string, barberId?: string) => {
+      const search = new URLSearchParams();
+      if (date) search.set('date', date);
+      if (barberId) search.set('barberId', barberId);
+      const query = search.toString();
+      return apiFetch<{ appointments: Appointment[] }>(
+        `/api/appointments${query ? `?${query}` : ''}`,
+      );
+    },
     create: (data: Record<string, unknown>) =>
       apiFetch<{ appointment: Appointment }>('/api/appointments', {
         method: 'POST',
@@ -106,8 +124,47 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
+    reschedule: (id: string, data: Record<string, unknown>) =>
+      apiFetch<{ appointment: Appointment }>(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     remove: (id: string) =>
       apiFetch<{ ok: true }>(`/api/appointments/${id}`, { method: 'DELETE' }),
+    /** Seguimiento público y acotado, usado en /booking/success|pending|failure. */
+    track: (id: string) =>
+      apiFetch<{ appointment: TrackedAppointment }>(`/api/appointments/track/${id}`),
+  },
+  /** Reserva pública con cobro: crea el turno `pending_payment` + preferencia de MP. */
+  checkout: (data: Record<string, unknown>) =>
+    apiFetch<{ appointment: Appointment; checkoutUrl: string }>('/api/checkout', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  users: {
+    list: () => apiFetch<{ users: Profile[] }>('/api/users'),
+    create: (data: {
+      email: string;
+      password: string;
+      name: string;
+      phone: string;
+      role: 'admin' | 'editor';
+      barberId: string | null;
+    }) =>
+      apiFetch<{ user: Profile }>('/api/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: Partial<Omit<Profile, 'id' | 'email' | 'createdAt'>> & { password?: string },
+    ) =>
+      apiFetch<{ user: Profile }>(`/api/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/users/${id}`, { method: 'DELETE' }),
   },
   auth: {
     login: (email: string, password: string) =>
@@ -121,11 +178,14 @@ export const api = {
       phone: string;
       password: string;
     }) =>
-      apiFetch<{ user: { id: string; name: string } }>('/api/auth/register', {
+      apiFetch<{
+        user: { id: string; name: string };
+        needsEmailConfirmation?: boolean;
+      }>('/api/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     logout: () => apiFetch<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
-    me: () => apiFetch<{ session: SessionPayload | null }>('/api/auth/me'),
+    me: () => apiFetch<{ session: Session | null }>('/api/auth/me'),
   },
 };

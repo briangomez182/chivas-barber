@@ -15,7 +15,7 @@ export function RegisterForm() {
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [done, setDone] = useState<boolean>(false);
+  const [done, setDone] = useState<'redirect' | 'confirm-email' | null>(null);
 
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
@@ -25,8 +25,12 @@ export function RegisterForm() {
     setError(null);
 
     try {
-      await api.auth.register({ name, email, phone, password });
-      setDone(true);
+      const result = await api.auth.register({ name, email, phone, password });
+      if (result.needsEmailConfirmation) {
+        setDone('confirm-email');
+        return;
+      }
+      setDone('redirect');
       setTimeout(() => {
         router.push('/#agenda');
         router.refresh();
@@ -37,7 +41,24 @@ export function RegisterForm() {
     }
   };
 
-  if (done) {
+  if (done === 'confirm-email') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl bg-brand-50 px-6 py-8 text-center"
+      >
+        <p className="text-lg font-extrabold tracking-tight text-ink">
+          Revisá tu email
+        </p>
+        <p className="mt-2 text-sm text-ink-soft">
+          Te mandamos un link para confirmar tu cuenta antes de ingresar.
+        </p>
+      </motion.div>
+    );
+  }
+
+  if (done === 'redirect') {
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}

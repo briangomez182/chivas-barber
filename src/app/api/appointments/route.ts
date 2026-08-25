@@ -7,7 +7,8 @@ import {
   getSettings,
   listAppointments,
 } from '@/lib/db';
-import { getSession } from '@/lib/guard';
+import { getSession, requireStaff } from '@/lib/guard';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,26 +27,62 @@ interface AppointmentBody {
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-/** GET /api/appointments — listado (sólo admin). `?date=` filtra por día. */
+/**
+ * GET /api/appointments — listado (staff). `?date=` filtra por día.
+ * `?barberId=` filtra por barbero (lo usa el admin) — un editor lo ignora:
+ * siempre ve sólo su propio barbero.
+ */
 export async function GET(request: Request): Promise<NextResponse> {
   const session = await getSession();
-  if (!session || session.role !== 'admin') {
+  if (!session || (session.role !== 'admin' && session.role !== 'editor')) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
 
-  const appointments = await listAppointments(date ? { date } : {});
+  if (session.role === 'editor') {
+    const supabase = await createServerSupabaseClient();
+    const appointments = await listAppointments(
+      { ...(date ? { date } : {}), barberId: session.barberId ?? undefined },
+      supabase,
+    );
+    return NextResponse.json({ appointments });
+  }
+
+  const barberId = searchParams.get('barberId');
+  const appointments = await listAppointments({
+    ...(date ? { date } : {}),
+    ...(barberId ? { barberId } : {}),
+  });
 
   return NextResponse.json({ appointments });
 }
 
-/** POST /api/appointments — reserva pública de un turno. */
+/**
+ * POST /api/appointments — alta manual de un turno por staff (admin o
+ * editor), ya `confirmed`, sin pasar por Mercado Pago.
+ *
+ * Antes esto también aceptaba reservas públicas anónimas — quedó cerrado a
+ * staff porque ahora el turno público SIEMPRE se paga: el flujo con cobro es
+ * `POST /api/checkout`, que crea el turno en `pending_payment` y sólo lo
+ * confirma cuando llega el webhook de pago aprobado
+ * (`/api/mercado-pago/webhook`). Dejar este endpoint abierto a cualquiera
+ * permitiría confirmarse un turno gratis pegándole directo, sin pagar.
+ *
+ * Si quien reserva es editor, se fuerza `barberId` a su propio barbero (alta
+ * manual "estrictamente en su propia agenda"), sin importar qué `barberId`
+ * haya mandado el body.
+ */
 export async function POST(request: Request): Promise<NextResponse> {
+  const guard = await requireStaff();
+  if ('response' in guard) return guard.response;
+  const { session } = guard;
+
   const body = (await request.json().catch(() => ({}))) as AppointmentBody;
 
-  const barberId = body.barberId?.trim() ?? '';
+  const isEditor = session.role === 'editor';
+  const barberId = isEditor ? (session.barberId ?? '') : (body.barberId?.trim() ?? '');
   const date = body.date?.trim() ?? '';
   const time = body.time?.trim() ?? '';
   const customerName = body.customerName?.trim() ?? '';
@@ -89,19 +126,25 @@ export async function POST(request: Request): Promise<NextResponse> {
   // El chequeo de solapamiento vive dentro de la transacción de Postgres
   // (ver `book_appointment` en supabase/schema.sql), no acá: si lo hiciéramos
   // en JS, dos reservas simultáneas podrían tomar el mismo horario.
-  const result = await bookAppointment({
-    barberId,
-    serviceId: service?.id ?? null,
-    date,
-    time,
-    durationMin,
-    customerName,
-    customerPhone,
-    customerEmail: body.customerEmail?.trim() || null,
-    notes: body.notes?.trim() || null,
-  });
+  const result = await bookAppointment(
+    {
+      barberId,
+      serviceId: service?.id ?? null,
+      date,
+      time,
+      durationMin,
+      customerName,
+      customerPhone,
+      customerEmail: body.customerEmail?.trim() || null,
+      notes: body.notes?.trim() || null,
+    },
+    isEditor ? await createServerSupabaseClient() : undefined,
+  );
 
   if ('error' in result) {
+    if (result.error === 'FORBIDDEN') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    }
     return NextResponse.json(
       { error: 'Ese horario ya fue reservado. Elegí otro.' },
       { status: 409 },

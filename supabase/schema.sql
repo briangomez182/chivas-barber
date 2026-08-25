@@ -80,7 +80,11 @@ create index if not exists appointments_date_idx on public.appointments (date);
 create index if not exists appointments_barber_date_idx on public.appointments (barber_id, date);
 
 -- ---------------------------------------------------------------------------
--- users — autenticación propia (scrypt + cookie HMAC), no Supabase Auth
+-- users — OBSOLETA. Login propio (scrypt + cookie HMAC), reemplazado por
+-- Supabase Auth + `public.profiles` (ver supabase/migrations/0002_rbac_auth.sql).
+-- No se borra acá: puede tener cuentas reales y su hash no es compatible con
+-- Supabase Auth (no hay migración automática de contraseñas). El código de la
+-- app ya no la usa. Borrarla es una decisión manual aparte.
 -- ---------------------------------------------------------------------------
 create table if not exists public.users (
   id            uuid primary key default gen_random_uuid(),
@@ -173,10 +177,12 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 --
--- Se habilita en todas las tablas y NO se define ninguna policy: eso deja las
--- claves públicas (`anon` / `authenticated`) sin acceso a nada. La app entra
--- únicamente con la service_role key desde los Route Handlers, que salta RLS.
--- Si alguna vez se expone el cliente al navegador, hay que escribir policies.
+-- Se habilita en todas las tablas y NO se define ninguna policy acá: eso deja
+-- las claves públicas (`anon` / `authenticated`) sin acceso a nada por
+-- default. La mayoría de las rutas entran con la service_role key, que
+-- saltea RLS. `appointments` y `profiles` sí tienen policies — se agregan en
+-- supabase/migrations/0002_rbac_auth.sql, porque el panel de editor consulta
+-- esas tablas con la sesión real del usuario (ver ese archivo para el porqué).
 -- ---------------------------------------------------------------------------
 alter table public.settings     enable row level security;
 alter table public.barbers      enable row level security;

@@ -1,22 +1,45 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { SESSION_COOKIE, verifySession } from '@/lib/session';
+import { createMiddlewareSupabaseClient } from '@/lib/supabase/middleware';
 
 /**
- * Protege `/admin`. Corre en el Edge Runtime, por eso la verificación de la
- * cookie usa Web Crypto (ver `lib/session.ts`) y no `node:crypto`.
+ * Protege `/admin`. Corre en el Edge Runtime.
+ *
+ * `admin`: acceso total. `editor`: confinado a `/admin/mis-turnos` (no puede
+ * tocar barberos/servicios/configuración ni turnos de otros barberos —
+ * también lo enforce RLS, esto es sólo la primera barrera de UX). Sin sesión
+ * o rol `client`: afuera.
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = await verifySession(token);
+  const { supabase, getResponse } = createMiddlewareSupabaseClient(request);
 
-  if (!session || session.role !== 'admin') {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const redirectToLogin = (): NextResponse => {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  };
+
+  if (!user) return redirectToLogin();
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle<{ role: string }>();
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'editor')) {
+    return redirectToLogin();
   }
 
-  return NextResponse.next();
+  if (profile.role === 'editor' && request.nextUrl.pathname !== '/admin/mis-turnos') {
+    return NextResponse.redirect(new URL('/admin/mis-turnos', request.url));
+  }
+
+  return getResponse();
 }
 
 export const config = {

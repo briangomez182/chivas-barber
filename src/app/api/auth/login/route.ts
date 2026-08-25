@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 
-import { findUserByEmail } from '@/lib/db';
-import { verifyPassword } from '@/lib/password';
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from '@/lib/session';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 interface LoginBody {
   email?: string;
   password?: string;
 }
 
-/** POST /api/auth/login — credenciales de prueba: `admin` / `admin`. */
+interface ProfileRow {
+  name: string;
+  role: string;
+}
+
+/** POST /api/auth/login */
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json().catch(() => ({}))) as LoginBody;
   const email = body.email?.trim().toLowerCase() ?? '';
@@ -17,37 +20,37 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (!email || !password) {
     return NextResponse.json(
-      { error: 'Usuario y contraseña son obligatorios' },
+      { error: 'Email y contraseña son obligatorios' },
       { status: 400 },
     );
   }
 
-  const user = await findUserByEmail(email);
+  const supabase = await createServerSupabaseClient();
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
     return NextResponse.json(
-      { error: 'Usuario o contraseña incorrectos' },
+      { error: 'Email o contraseña incorrectos' },
       { status: 401 },
     );
   }
 
-  const token = await signSession({
-    sub: user.id,
-    name: user.name,
-    role: user.role,
-  });
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, role')
+    .eq('id', data.user.id)
+    .maybeSingle<ProfileRow>();
 
-  const response = NextResponse.json({
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  return NextResponse.json({
+    user: {
+      id: data.user.id,
+      name: profile?.name ?? '',
+      email: data.user.email,
+      role: profile?.role ?? 'client',
+    },
   });
-
-  response.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE,
-    secure: process.env.NODE_ENV === 'production',
-  });
-
-  return response;
 }
