@@ -12,7 +12,7 @@ Three.js vía `@react-three/fiber` + `@react-three/drei`.
 
 ```bash
 npm install
-cp .env.example .env.local   # opcional: define AUTH_SECRET
+cp .env.example .env.local   # completá SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY
 npm run dev                  # http://localhost:3000
 ```
 
@@ -23,11 +23,39 @@ npm run build      # build de producción
 npm run start      # servidor de producción
 npm run lint       # ESLint (next/core-web-vitals + next/typescript)
 npm run typecheck  # tsc --noEmit
+npm run db:seed    # carga los datos iniciales en Supabase
 ```
 
-> La primera vez que se accede al sitio se crea `data/db.json` con los datos
-> semilla: 3 barberos (John, Alex, Mateo), 5 servicios, la configuración de la
-> agenda y el usuario administrador.
+### Base de datos (Supabase)
+
+Los datos viven en Postgres, en un proyecto de [Supabase](https://supabase.com).
+Preparación, una sola vez:
+
+1. Creá un proyecto en Supabase.
+2. En **SQL Editor**, pegá y ejecutá el contenido de
+   [`supabase/schema.sql`](supabase/schema.sql). Crea las tablas, los índices,
+   la función `book_appointment` y activa Row Level Security.
+3. En **Project Settings › API**, copiá la *Project URL* y la *service_role*
+   key a `.env.local` (`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`).
+4. Cargá los datos iniciales:
+
+   ```bash
+   npm run db:seed
+   ```
+
+   Si todavía existe `data/db.json` (el store en archivo que se usaba antes),
+   el script migra **esos** datos y conserva los hashes de contraseña. Si no,
+   carga el catálogo de demo: 3 barberos, 5 servicios y un admin.
+
+   La contraseña del admin sale de `ADMIN_PASSWORD` (por defecto `admin`):
+
+   ```bash
+   ADMIN_PASSWORD='algo-mejor' npm run db:seed
+   ```
+
+> **La `service_role` key salta Row Level Security: es una credencial de
+> servidor.** Sólo se usa desde Route Handlers y Server Components
+> (`lib/supabase.ts`). Nunca la pongas en una variable `NEXT_PUBLIC_*`.
 
 
 
@@ -83,10 +111,13 @@ src/
 │   ├── admin/                # AdminDashboard + paneles CRUD
 │   └── ui/                   # Modal, Field, BarberAvatar
 ├── lib/
-│   ├── types.ts  db.ts  slots.ts  date.ts
+│   ├── types.ts  db.ts  supabase.ts  slots.ts  date.ts
 │   ├── session.ts  password.ts  guard.ts
 │   ├── api-client.ts  brand.ts
 └── middleware.ts             # protege /admin (Edge Runtime)
+
+supabase/schema.sql           # tablas, índices, book_appointment, RLS
+scripts/seed.mjs              # carga inicial / migración desde data/db.json
 ```
 
 ---
@@ -127,9 +158,16 @@ servidor.
 
 ## Decisiones técnicas
 
-- **Persistencia**: store JSON en `data/db.json` (`lib/db.ts`), con cola de
-  escritura para evitar condiciones de carrera. Para migrar a Postgres/Prisma
-  alcanza con reimplementar ese módulo; la UI no cambia.
+- **Persistencia**: Postgres en Supabase, vía `@supabase/supabase-js` con la
+  `service_role` key desde el servidor (`lib/supabase.ts`). `lib/db.ts` expone
+  funciones por entidad (`listBarbers`, `bookAppointment`, …) y traduce entre
+  el `snake_case` de Postgres y el `camelCase` del dominio.
+- **Reservas sin doble booking**: el chequeo de solapamiento y el `INSERT`
+  ocurren dentro de la función Postgres `book_appointment`, que toma un
+  advisory lock por (barbero, día). Hacerlo en JS dejaría una ventana entre el
+  `SELECT` y el `INSERT` donde dos reservas simultáneas toman el mismo hueco.
+- **RLS**: activo en todas las tablas y sin policies, así las claves públicas
+  no acceden a nada. El único camino a los datos es el servidor.
 - **Auth**: mock con cookie `httpOnly` firmada con HMAC-SHA256 vía **Web
   Crypto**, para que el mismo código valide en Node y en el Edge Runtime del
   middleware. Contraseñas con `scrypt` + salt. Para producción conviene
@@ -141,9 +179,22 @@ servidor.
 
 ---
 
-## Deploy
+## Deploy (Vercel)
 
-Vercel funciona out of the box, con una salvedad: el filesystem de las
-funciones serverless es efímero, así que `data/db.json` se reinicia. Antes de
-publicar, reemplazá `lib/db.ts` por una base real (Vercel Postgres, Supabase,
-Turso, Neon…). Definí también `AUTH_SECRET` en las variables de entorno.
+1. Importá el repo en Vercel. **Root Directory** tiene que quedar en `./` — es
+   donde está `package.json`; si apunta a otro lado el build falla con
+   *"No Next.js version detected"*.
+2. Cargá las variables de entorno en **Settings › Environment Variables**
+   (Production, Preview y Development):
+
+   | Variable | Valor |
+   | --- | --- |
+   | `AUTH_SECRET` | `openssl rand -base64 32` |
+   | `SUPABASE_URL` | Project URL de Supabase |
+   | `SUPABASE_SERVICE_ROLE_KEY` | service_role key de Supabase |
+
+3. Deploy. El esquema y los datos ya viven en Supabase, así que no hace falta
+   ningún paso de migración en el build.
+
+Si cambiás `AUTH_SECRET` después de publicar, las sesiones abiertas se
+invalidan y todo el mundo tiene que volver a entrar.

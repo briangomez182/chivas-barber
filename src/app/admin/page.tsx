@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { readDb } from '@/lib/db';
+import { getSettings, listBarbers, listServices } from '@/lib/db';
 import { getSession } from '@/lib/guard';
 
 export const metadata: Metadata = {
@@ -17,14 +17,19 @@ export default async function AdminPage() {
   const session = await getSession();
   if (!session || session.role !== 'admin') redirect('/login?next=/admin');
 
-  const db = await readDb();
+  // El panel administra también a los barberos dados de baja.
+  const [barbers, services, settings] = await Promise.all([
+    listBarbers(true),
+    listServices(),
+    getSettings(),
+  ]);
 
   return (
     <AdminDashboard
       adminName={session.name}
-      initialBarbers={db.barbers}
-      initialServices={db.services}
-      initialSettings={db.settings}
+      initialBarbers={barbers}
+      initialServices={services}
+      initialSettings={settings}
     />
   );
 }

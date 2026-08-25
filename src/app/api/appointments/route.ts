@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { createId, readDb, updateDb } from '@/lib/db';
+import {
+  bookAppointment,
+  getBarber,
+  getService,
+  getSettings,
+  listAppointments,
+} from '@/lib/db';
 import { getSession } from '@/lib/guard';
-import { hasConflict } from '@/lib/slots';
-import type { Appointment } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,11 +35,8 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
-  const db = await readDb();
 
-  const appointments = db.appointments
-    .filter((item) => (date ? item.date === date : true))
-    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const appointments = await listAppointments(date ? { date } : {});
 
   return NextResponse.json({ appointments });
 }
@@ -69,49 +70,42 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const result = await updateDb((db) => {
-    const barber = db.barbers.find((item) => item.id === barberId);
-    if (!barber || !barber.active) {
-      return { error: 'El barbero seleccionado no está disponible' } as const;
-    }
+  const barber = await getBarber(barberId);
+  if (!barber || !barber.active) {
+    return NextResponse.json(
+      { error: 'El barbero seleccionado no está disponible' },
+      { status: 409 },
+    );
+  }
 
-    const service = body.serviceId
-      ? db.services.find((item) => item.id === body.serviceId)
-      : undefined;
+  const service = body.serviceId ? await getService(body.serviceId) : null;
 
-    const durationMin = service
-      ? service.durationMin
-      : Number.isFinite(Number(body.durationMin)) && Number(body.durationMin) > 0
-        ? Math.round(Number(body.durationMin))
-        : db.settings.slotIntervalMin;
+  const durationMin = service
+    ? service.durationMin
+    : Number.isFinite(Number(body.durationMin)) && Number(body.durationMin) > 0
+      ? Math.round(Number(body.durationMin))
+      : (await getSettings()).slotIntervalMin;
 
-    const candidate = { barberId, date, time, durationMin };
-
-    if (hasConflict(db.appointments, candidate, db.settings.bufferMin)) {
-      return { error: 'Ese horario ya fue reservado. Elegí otro.' } as const;
-    }
-
-    const appointment: Appointment = {
-      id: createId(),
-      barberId,
-      serviceId: service?.id ?? null,
-      date,
-      time,
-      durationMin,
-      customerName,
-      customerPhone,
-      customerEmail: body.customerEmail?.trim() || null,
-      notes: body.notes?.trim() || null,
-      status: 'confirmed',
-      createdAt: new Date().toISOString(),
-    };
-
-    db.appointments.push(appointment);
-    return { appointment } as const;
+  // El chequeo de solapamiento vive dentro de la transacción de Postgres
+  // (ver `book_appointment` en supabase/schema.sql), no acá: si lo hiciéramos
+  // en JS, dos reservas simultáneas podrían tomar el mismo horario.
+  const result = await bookAppointment({
+    barberId,
+    serviceId: service?.id ?? null,
+    date,
+    time,
+    durationMin,
+    customerName,
+    customerPhone,
+    customerEmail: body.customerEmail?.trim() || null,
+    notes: body.notes?.trim() || null,
   });
 
   if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 409 });
+    return NextResponse.json(
+      { error: 'Ese horario ya fue reservado. Elegí otro.' },
+      { status: 409 },
+    );
   }
 
   return NextResponse.json({ appointment: result.appointment }, { status: 201 });

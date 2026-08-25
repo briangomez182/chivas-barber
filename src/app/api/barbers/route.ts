@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { createId, readDb, updateDb } from '@/lib/db';
+import { createBarber, listBarbers } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
-import type { Barber } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +18,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const includeInactive = searchParams.get('all') === '1';
 
-  const db = await readDb();
-  const barbers = includeInactive
-    ? db.barbers
-    : db.barbers.filter((item) => item.active);
+  const barbers = await listBarbers(includeInactive);
 
   return NextResponse.json({ barbers });
 }
@@ -42,18 +38,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const barber: Barber = {
-    id: createId(),
+  const barber = await createBarber({
     name,
     role: body.role?.trim() || 'Barber',
     specialty: body.specialty?.trim() || 'Corte y barba',
     photoUrl: body.photoUrl?.trim() || '',
     active: body.active ?? true,
-    createdAt: new Date().toISOString(),
-  };
-
-  await updateDb((db) => {
-    db.barbers.push(barber);
   });
 
   return NextResponse.json({ barber }, { status: 201 });

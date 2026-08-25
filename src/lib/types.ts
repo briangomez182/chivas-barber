@@ -72,15 +72,6 @@ export interface User {
   createdAt: string;
 }
 
-/** Forma completa del store persistido en `data/db.json`. */
-export interface Database {
-  barbers: Barber[];
-  services: Service[];
-  appointments: Appointment[];
-  users: User[];
-  settings: Settings;
-}
-
 /** Un bloque horario calculado para una fecha + barbero. */
 export interface Slot {
   /** `HH:mm` */

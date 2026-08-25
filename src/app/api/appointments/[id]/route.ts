@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { updateDb } from '@/lib/db';
+import { deleteAppointment, setAppointmentStatus } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
 import type { AppointmentStatus } from '@/lib/types';
 
@@ -32,14 +32,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
   }
 
-  const status = body.status;
-
-  const appointment = await updateDb((db) => {
-    const found = db.appointments.find((item) => item.id === id);
-    if (!found) return null;
-    found.status = status;
-    return found;
-  });
+  const appointment = await setAppointmentStatus(id, body.status);
 
   if (!appointment) {
     return NextResponse.json({ error: 'Turno no encontrado' }, { status: 404 });
@@ -58,12 +51,7 @@ export async function DELETE(
 
   const { id } = await context.params;
 
-  const removed = await updateDb((db) => {
-    const index = db.appointments.findIndex((item) => item.id === id);
-    if (index === -1) return false;
-    db.appointments.splice(index, 1);
-    return true;
-  });
+  const removed = await deleteAppointment(id);
 
   if (!removed) {
     return NextResponse.json({ error: 'Turno no encontrado' }, { status: 404 });

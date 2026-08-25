@@ -4,14 +4,17 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { BookingExperience } from '@/components/sections/BookingExperience';
 import { LocationSection } from '@/components/sections/LocationSection';
 import { ServicesSection } from '@/components/sections/ServicesSection';
-import { readDb } from '@/lib/db';
+import { getSettings, listBarbers, listServices } from '@/lib/db';
 
-/** El store cambia con cada reserva: la home siempre se renderiza al vuelo. */
+/** Los datos cambian con cada reserva: la home siempre se renderiza al vuelo. */
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const db = await readDb();
-  const barbers = db.barbers.filter((barber) => barber.active);
+  const [barbers, services, settings] = await Promise.all([
+    listBarbers(),
+    listServices(),
+    getSettings(),
+  ]);
 
   return (
     <>
@@ -19,11 +22,11 @@ export default async function HomePage() {
 
       <main>
         <Hero />
-        <ServicesSection services={db.services} />
+        <ServicesSection services={services} />
         <BookingExperience
           barbers={barbers}
-          services={db.services}
-          settings={db.settings}
+          services={services}
+          settings={settings}
         />
         <LocationSection />
       </main>

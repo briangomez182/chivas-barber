@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { updateDb } from '@/lib/db';
+import { deleteService, updateService, type ServiceInput } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
 import type { Service } from '@/lib/types';
 
@@ -21,32 +21,29 @@ export async function PATCH(
   const { id } = await context.params;
   const body = (await request.json().catch(() => ({}))) as ServicePatch;
 
-  const result = await updateDb((db) => {
-    const service = db.services.find((item) => item.id === id);
-    if (!service) return null;
+  const patch: Partial<ServiceInput> = {};
 
-    if (typeof body.name === 'string' && body.name.trim()) {
-      service.name = body.name.trim();
-    }
-    if (typeof body.description === 'string') {
-      service.description = body.description.trim();
-    }
-    if (Number.isFinite(Number(body.durationMin))) {
-      service.durationMin = Math.round(Number(body.durationMin));
-    }
-    if (Number.isFinite(Number(body.price))) {
-      service.price = Math.round(Number(body.price));
-    }
-    if (typeof body.featured === 'boolean') service.featured = body.featured;
+  if (typeof body.name === 'string' && body.name.trim()) {
+    patch.name = body.name.trim();
+  }
+  if (typeof body.description === 'string') {
+    patch.description = body.description.trim();
+  }
+  if (Number.isFinite(Number(body.durationMin))) {
+    patch.durationMin = Math.round(Number(body.durationMin));
+  }
+  if (Number.isFinite(Number(body.price))) {
+    patch.price = Math.round(Number(body.price));
+  }
+  if (typeof body.featured === 'boolean') patch.featured = body.featured;
 
-    return service;
-  });
+  const service = await updateService(id, patch);
 
-  if (!result) {
+  if (!service) {
     return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 });
   }
 
-  return NextResponse.json({ service: result });
+  return NextResponse.json({ service });
 }
 
 /** DELETE /api/services/:id (admin) */
@@ -59,16 +56,7 @@ export async function DELETE(
 
   const { id } = await context.params;
 
-  const removed = await updateDb((db) => {
-    const index = db.services.findIndex((item) => item.id === id);
-    if (index === -1) return false;
-
-    db.services.splice(index, 1);
-    for (const appointment of db.appointments) {
-      if (appointment.serviceId === id) appointment.serviceId = null;
-    }
-    return true;
-  });
+  const removed = await deleteService(id);
 
   if (!removed) {
     return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { readDb } from '@/lib/db';
+import { getBarber, getSettings, listAppointments } from '@/lib/db';
 import { buildSlots } from '@/lib/slots';
 
 export const dynamic = 'force-dynamic';
@@ -26,24 +26,25 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  const db = await readDb();
-
-  if (barberId && !db.barbers.some((item) => item.id === barberId)) {
+  if (barberId && !(await getBarber(barberId))) {
     return NextResponse.json({ error: 'Barbero no encontrado' }, { status: 404 });
   }
 
+  const settings = await getSettings();
+
   const durationMin = Number.isFinite(durationParam) && durationParam > 0
     ? Math.round(durationParam)
-    : db.settings.slotIntervalMin;
+    : settings.slotIntervalMin;
 
-  const appointments = db.appointments.filter(
-    (item) => item.date === date && (!barberId || item.barberId === barberId),
-  );
+  const appointments = await listAppointments({
+    date,
+    ...(barberId ? { barberId } : {}),
+  });
 
   const slots = buildSlots({
     date,
     durationMin,
-    settings: db.settings,
+    settings,
     appointments,
   });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { readDb } from '@/lib/db';
+import { findUserByEmail } from '@/lib/db';
 import { verifyPassword } from '@/lib/password';
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from '@/lib/session';
 
@@ -22,8 +22,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const db = await readDb();
-  const user = db.users.find((item) => item.email.toLowerCase() === email);
+  const user = await findUserByEmail(email);
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json(

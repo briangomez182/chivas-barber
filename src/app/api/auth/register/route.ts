@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { createId, updateDb } from '@/lib/db';
+import { createUser } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from '@/lib/session';
-import type { User } from '@/lib/types';
 
 interface RegisterBody {
   name?: string;
@@ -36,26 +35,19 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const passwordHash = await hashPassword(password);
 
-  const result = await updateDb((db) => {
-    const exists = db.users.some((item) => item.email.toLowerCase() === email);
-    if (exists) return { error: 'Ya existe una cuenta con ese email' } as const;
-
-    const user: User = {
-      id: createId(),
-      name,
-      email,
-      phone,
-      passwordHash,
-      role: 'client',
-      createdAt: new Date().toISOString(),
-    };
-
-    db.users.push(user);
-    return { user } as const;
+  const result = await createUser({
+    name,
+    email,
+    phone,
+    passwordHash,
+    role: 'client',
   });
 
   if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 409 });
+    return NextResponse.json(
+      { error: 'Ya existe una cuenta con ese email' },
+      { status: 409 },
+    );
   }
 
   const token = await signSession({

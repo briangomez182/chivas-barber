@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { createId, readDb, updateDb } from '@/lib/db';
+import { createService, listServices } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
-import type { Service } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +15,8 @@ interface ServiceBody {
 
 /** GET /api/services */
 export async function GET(): Promise<NextResponse> {
-  const db = await readDb();
-  return NextResponse.json({ services: db.services });
+  const services = await listServices();
+  return NextResponse.json({ services });
 }
 
 /** POST /api/services — alta de servicio (admin). */
@@ -46,18 +45,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Precio inválido' }, { status: 400 });
   }
 
-  const service: Service = {
-    id: createId(),
+  const service = await createService({
     name,
     description: body.description?.trim() ?? '',
     durationMin: Math.round(durationMin),
     price: Math.round(price),
     featured: body.featured ?? false,
-    createdAt: new Date().toISOString(),
-  };
-
-  await updateDb((db) => {
-    db.services.push(service);
   });
 
   return NextResponse.json({ service }, { status: 201 });

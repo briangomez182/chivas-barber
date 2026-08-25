@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { readDb, updateDb } from '@/lib/db';
+import { getSettings, updateSettings, type SettingsPatch } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
 import { SLOT_INTERVALS, type SlotInterval } from '@/lib/types';
 
@@ -22,8 +22,8 @@ function isSlotInterval(value: number): value is SlotInterval {
 
 /** GET /api/settings */
 export async function GET(): Promise<NextResponse> {
-  const db = await readDb();
-  return NextResponse.json({ settings: db.settings });
+  const settings = await getSettings();
+  return NextResponse.json({ settings });
 }
 
 /** PUT /api/settings — parámetros globales de la agenda (admin). */
@@ -52,25 +52,25 @@ export async function PUT(request: Request): Promise<NextResponse> {
     }
   }
 
-  const settings = await updateDb((db) => {
-    if (body.slotIntervalMin !== undefined) {
-      const value = Number(body.slotIntervalMin);
-      if (isSlotInterval(value)) db.settings.slotIntervalMin = value;
-    }
-    if (body.openingTime) db.settings.openingTime = body.openingTime;
-    if (body.closingTime) db.settings.closingTime = body.closingTime;
-    if (Array.isArray(body.workingDays)) {
-      db.settings.workingDays = body.workingDays
-        .map(Number)
-        .filter((day) => day >= 0 && day <= 6)
-        .sort((a, b) => a - b);
-    }
-    if (Number.isFinite(Number(body.bufferMin))) {
-      db.settings.bufferMin = Math.max(0, Math.round(Number(body.bufferMin)));
-    }
+  const patch: SettingsPatch = {};
 
-    return db.settings;
-  });
+  if (body.slotIntervalMin !== undefined) {
+    const value = Number(body.slotIntervalMin);
+    if (isSlotInterval(value)) patch.slotIntervalMin = value;
+  }
+  if (body.openingTime) patch.openingTime = body.openingTime;
+  if (body.closingTime) patch.closingTime = body.closingTime;
+  if (Array.isArray(body.workingDays)) {
+    patch.workingDays = body.workingDays
+      .map(Number)
+      .filter((day) => day >= 0 && day <= 6)
+      .sort((a, b) => a - b);
+  }
+  if (Number.isFinite(Number(body.bufferMin))) {
+    patch.bufferMin = Math.max(0, Math.round(Number(body.bufferMin)));
+  }
+
+  const settings = await updateSettings(patch);
 
   return NextResponse.json({ settings });
 }

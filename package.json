@@ -2,17 +2,19 @@
   "name": "chivas-barberia-club",
   "version": "1.0.0",
   "private": true,
-  "description": "Sitio web y sistema de agendamiento de Chivas Barbería Club",
+  "description": "Sitio web y sistema de agendamiento de Chivas Barber\u00eda Club",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:seed": "node --env-file=.env.local scripts/seed.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.6",
     "@react-three/fiber": "^9.1.0",
+    "@supabase/supabase-js": "^2.112.4",
     "framer-motion": "^12.6.0",
     "next": "15.5.23",
     "react": "19.0.0",
