@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { api } from '@/lib/api-client';
+import { whatsappLink } from '@/lib/brand';
 import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
 import type {
   Barber,
@@ -48,6 +50,7 @@ export function BookingWidget({
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
 
   const selectedService = useMemo<Service | undefined>(
     () => services.find((item) => item.id === serviceId),
@@ -158,6 +161,7 @@ export function BookingWidget({
     Boolean(serviceId) &&
     customerName.trim().length >= 2 &&
     customerPhone.replace(/\D/g, '').length >= 8 &&
+    termsAccepted &&
     !submitting &&
     !redirecting;
 
@@ -191,6 +195,23 @@ export function BookingWidget({
               onChange={setDate}
               workingDays={settings.workingDays}
             />
+
+            {settings.depositEnabled && (
+              <p className="mt-5 rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
+                <strong className="font-bold">Importante:</strong> si no
+                podés asistir a tu turno, la seña no se reintegra. Si
+                necesitás cambiarlo, avisanos con anticipación por{' '}
+                <a
+                  href={whatsappLink('Hola, necesito reprogramar mi turno.')}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  WhatsApp
+                </a>{' '}
+                y no perdés la seña.
+              </p>
+            )}
 
             <div className="mt-8 border-t border-gray-100 pt-6">
               <DurationPills value={durationMin} onChange={handleDurationChange} />
@@ -310,32 +331,56 @@ export function BookingWidget({
                     onChange={(event) => setCustomerPhone(event.target.value)}
                   />
                 </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="email" className="sr-only">
-                    Email (opcional)
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Email (opcional)"
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="notes" className="sr-only">
-                    Comentarios
-                  </label>
-                  <textarea
-                    id="notes"
-                    rows={2}
-                    placeholder="Comentarios para tu barbero (opcional)"
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                  />
-                </div>
+                {settings.showOptionalBookingFields && (
+                  <>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="email" className="sr-only">
+                        Email (opcional)
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder="Email (opcional)"
+                        value={customerEmail}
+                        onChange={(event) => setCustomerEmail(event.target.value)}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="notes" className="sr-only">
+                        Comentarios
+                      </label>
+                      <textarea
+                        id="notes"
+                        rows={2}
+                        placeholder="Comentarios para tu barbero (opcional)"
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
+
+              <label className="mt-4 flex items-start gap-3 text-sm text-ink-soft">
+                <input
+                  type="checkbox"
+                  required
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+                />
+                <span>
+                  Acepto los{' '}
+                  <Link
+                    href="/terminos"
+                    target="_blank"
+                    className="font-semibold text-brand hover:underline"
+                  >
+                    Términos y Condiciones
+                  </Link>
+                </span>
+              </label>
 
               <AnimatePresence>
                 {error && (

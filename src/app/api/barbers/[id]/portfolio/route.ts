@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import {
-  addBarberPortfolioImage,
-  listBarberPortfolioImages,
-} from '@/lib/db';
-import { requireAdmin, requireAdminOrEditor } from '@/lib/guard';
+import { listBarberPortfolioImages, uploadBarberPortfolioPhoto } from '@/lib/db';
+import { requireAdminOrEditor } from '@/lib/guard';
+import { readImageFile } from '@/lib/image-upload';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +16,10 @@ export async function GET(
   return NextResponse.json({ images });
 }
 
-/** POST /api/barbers/[id]/portfolio — admin o editor del barbero. */
+/**
+ * POST /api/barbers/[id]/portfolio — admin o editor del barbero.
+ * `multipart/form-data` con un campo `photo`. Sólo PNG/JPG/JPEG, hasta 5 MB.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -29,24 +30,19 @@ export async function POST(
   const guard = await requireAdminOrEditor(barberId);
   if ('response' in guard) return guard.response;
 
-  const body = (await request.json().catch(() => ({}))) as { imageUrl?: string };
-  const imageUrl = body.imageUrl?.trim() ?? '';
+  const result = await readImageFile(request);
+  if ('error' in result) return result.error;
+  const { file, contentType } = result;
 
-  if (!imageUrl || !imageUrl.startsWith('http')) {
-    return NextResponse.json(
-      { error: 'URL de imagen inválida' },
-      { status: 400 },
-    );
-  }
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const image = await uploadBarberPortfolioPhoto(barberId, buffer, contentType);
 
-  const result = await addBarberPortfolioImage(barberId, imageUrl);
-
-  if ('error' in result) {
+  if ('error' in image) {
     return NextResponse.json(
       { error: 'Ya alcanzaste el máximo de 5 imágenes' },
       { status: 422 },
     );
   }
 
-  return NextResponse.json({ image: result }, { status: 201 });
+  return NextResponse.json({ image }, { status: 201 });
 }

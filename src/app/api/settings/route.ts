@@ -15,6 +15,7 @@ interface SettingsBody {
   depositAmount?: number;
   depositEnabled?: boolean;
   showPaginationCount?: boolean;
+  showOptionalBookingFields?: boolean;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -84,6 +85,9 @@ export async function PUT(request: Request): Promise<NextResponse> {
   }
   if (body.showPaginationCount !== undefined) {
     patch.showPaginationCount = Boolean(body.showPaginationCount);
+  }
+  if (body.showOptionalBookingFields !== undefined) {
+    patch.showOptionalBookingFields = Boolean(body.showOptionalBookingFields);
   }
 
   if (patch.depositEnabled) {

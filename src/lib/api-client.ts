@@ -28,10 +28,15 @@ export async function apiFetch<T>(
   input: string,
   init?: RequestInit,
 ): Promise<T> {
+  // `FormData` (subida de archivos) necesita que el browser arme su propio
+  // header `Content-Type: multipart/form-data; boundary=...` — si lo
+  // forzamos a JSON acá, el servidor no puede parsear el body.
+  const isFormData = init?.body instanceof FormData;
+
   const response = await fetch(input, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(init?.headers ?? {}),
     },
     cache: 'no-store',
@@ -71,16 +76,29 @@ export const api = {
       }),
     remove: (id: string) =>
       apiFetch<{ ok: true }>(`/api/barbers/${id}`, { method: 'DELETE' }),
+    /** Sube/reemplaza la foto de perfil — PNG/JPG/JPEG, hasta 5 MB. */
+    uploadPhoto: (id: string, file: File) => {
+      const body = new FormData();
+      body.set('photo', file);
+      return apiFetch<{ barber: Barber }>(`/api/barbers/${id}/photo`, {
+        method: 'POST',
+        body,
+      });
+    },
     portfolio: {
       list: (barberId: string) =>
         apiFetch<{ images: BarberPortfolioImage[] }>(
           `/api/barbers/${barberId}/portfolio`,
         ),
-      add: (barberId: string, imageUrl: string) =>
-        apiFetch<{ image: BarberPortfolioImage }>(
+      /** PNG/JPG/JPEG, hasta 5 MB. */
+      add: (barberId: string, file: File) => {
+        const body = new FormData();
+        body.set('photo', file);
+        return apiFetch<{ image: BarberPortfolioImage }>(
           `/api/barbers/${barberId}/portfolio`,
-          { method: 'POST', body: JSON.stringify({ imageUrl }) },
-        ),
+          { method: 'POST', body },
+        );
+      },
       remove: (barberId: string, imageId: string) =>
         apiFetch<{ ok: true }>(
           `/api/barbers/${barberId}/portfolio/${imageId}`,

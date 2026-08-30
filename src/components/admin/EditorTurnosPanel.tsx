@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
 import { api } from '@/lib/api-client';
-import { formatDuration, formatLongDate, todayIso } from '@/lib/date';
+import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
 import type { Appointment, Barber, ScheduleBlock, Service, Settings } from '@/lib/types';
 
 interface EditorTurnosPanelProps {
@@ -152,6 +152,31 @@ export function EditorTurnosPanel({
 
   const serviceName = (id: string | null): string =>
     id ? (services.find((item) => item.id === id)?.name ?? '—') : 'Sin servicio';
+
+  /**
+   * Lo que falta cobrar en el local. Sólo se resta la seña si Mercado Pago
+   * la confirmó (`paymentStatus === 'approved'`) — cualquier otro estado
+   * (sin pago, pendiente, rechazado) debe el servicio completo. `null`
+   * cuando no hay servicio elegido (no hay precio de referencia) o el turno
+   * está cancelado (no hay nada que cobrar).
+   */
+  const debtOf = (appointment: Appointment): number | null => {
+    if (appointment.status === 'cancelled') return null;
+    const service = appointment.serviceId
+      ? services.find((item) => item.id === appointment.serviceId)
+      : null;
+    if (!service) return null;
+
+    const depositPaid = appointment.paymentStatus === 'approved';
+    return depositPaid
+      ? Math.max(service.price - (appointment.amount ?? 0), 0)
+      : service.price;
+  };
+
+  const debtLabel = (appointment: Appointment): string => {
+    const debt = debtOf(appointment);
+    return debt !== null ? formatPrice(debt) : '—';
+  };
 
   const setStatus = async (
     appointment: Appointment,
@@ -313,6 +338,7 @@ export function EditorTurnosPanel({
                   <th scope="col" className="px-6 py-4">Hora</th>
                   <th scope="col" className="px-6 py-4">Cliente</th>
                   <th scope="col" className="px-6 py-4">Servicio</th>
+                  <th scope="col" className="px-6 py-4">Deuda</th>
                   <th scope="col" className="px-6 py-4">Estado</th>
                   <th scope="col" className="px-6 py-4 text-right">Acciones</th>
                 </tr>
@@ -320,7 +346,7 @@ export function EditorTurnosPanel({
               <tbody className="divide-y divide-gray-100">
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-ink-muted">
+                    <td colSpan={6} className="px-6 py-12 text-center text-ink-muted">
                       Cargando turnos…
                     </td>
                   </tr>
@@ -328,7 +354,7 @@ export function EditorTurnosPanel({
 
                 {!loading && appointments.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-ink-soft">
+                    <td colSpan={6} className="px-6 py-12 text-center text-ink-soft">
                       No tenés turnos para esta fecha.
                     </td>
                   </tr>
@@ -359,6 +385,9 @@ export function EditorTurnosPanel({
                       </td>
                       <td className="px-6 py-4 text-ink-soft">
                         {serviceName(appointment.serviceId)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                        {debtLabel(appointment)}
                       </td>
                       <td className="px-6 py-4">
                         <span

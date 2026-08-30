@@ -93,7 +93,10 @@ export function SiteFooter() {
       <div className="border-t border-gray-100">
         <div className="container-page flex flex-col items-start justify-between gap-2 py-6 text-xs text-ink-muted sm:flex-row sm:items-center">
           <p>
-            © {year} {BRAND.name}. Todos los derechos reservados.
+            © {year} {BRAND.name}. Todos los derechos reservados. ·{' '}
+            <Link href="/terminos" className="underline-offset-2 hover:text-brand hover:underline">
+              Términos y Condiciones
+            </Link>
           </p>
           <p>Lunes a sábado · 10:00 — 20:00</p>
         </div>

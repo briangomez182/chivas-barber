@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
 
 export function LoginForm() {
@@ -66,9 +67,8 @@ export function LoginForm() {
         >
           Contraseña
         </label>
-        <input
+        <PasswordInput
           id="password"
-          type="password"
           required
           autoComplete="current-password"
           placeholder="••••••"

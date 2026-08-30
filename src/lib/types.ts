@@ -84,6 +84,12 @@ export interface Settings {
    * sólo se ven los botones Anterior/Siguiente.
    */
   showPaginationCount: boolean;
+  /**
+   * Módulo "Formulario de turnos": si es `true`, el formulario público de
+   * reserva (BookingWidget) muestra los campos de email y comentarios
+   * (ambos opcionales). Si es `false`, se ocultan por completo.
+   */
+  showOptionalBookingFields: boolean;
 }
 
 export interface Appointment {
@@ -100,7 +106,11 @@ export interface Appointment {
   customerEmail: string | null;
   notes: string | null;
   status: AppointmentStatus;
-  /** Precio del servicio al momento de la reserva (congelado). */
+  /**
+   * Seña cobrada por Mercado Pago al reservar (no el precio total del
+   * servicio) — `null` si el turno no pasó por el flujo de cobro (alta
+   * manual de staff, o reserva pública con la seña deshabilitada).
+   */
   amount: number | null;
   /** ID de pago de Mercado Pago, una vez que existe un intento de cobro. */
   paymentId: string | null;

@@ -62,6 +62,9 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
   const [showPaginationCount, setShowPaginationCount] = useState<boolean>(
     settings.showPaginationCount,
   );
+  const [showOptionalBookingFields, setShowOptionalBookingFields] = useState<boolean>(
+    settings.showOptionalBookingFields,
+  );
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,11 +80,13 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
         depositEnabled,
         depositAmount,
         showPaginationCount,
+        showOptionalBookingFields,
       });
       onChange(saved);
       setDepositEnabled(saved.depositEnabled);
       setDepositAmountText(String(saved.depositAmount));
       setShowPaginationCount(saved.showPaginationCount);
+      setShowOptionalBookingFields(saved.showOptionalBookingFields);
       setMessage('Configuración actualizada.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar');
@@ -163,6 +168,26 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
               }
               checked={showPaginationCount}
               onChange={setShowPaginationCount}
+            />
+          </div>
+        </div>
+
+        <div className="card p-7">
+          <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+            Formulario de turnos
+          </h3>
+
+          <div className="mt-4">
+            <SwitchRow
+              id="show-optional-booking-fields"
+              label="Mostrar campos de email y comentarios"
+              hint={
+                showOptionalBookingFields
+                  ? 'El formulario público de reserva pide email y comentarios (ambos opcionales).'
+                  : 'El formulario público de reserva sólo pide nombre y teléfono.'
+              }
+              checked={showOptionalBookingFields}
+              onChange={setShowOptionalBookingFields}
             />
           </div>
         </div>

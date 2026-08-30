@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
 
 export function RegisterForm() {
@@ -13,6 +15,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [done, setDone] = useState<'redirect' | 'confirm-email' | null>(null);
@@ -138,9 +141,8 @@ export function RegisterForm() {
         >
           Contraseña
         </label>
-        <input
+        <PasswordInput
           id="password"
-          type="password"
           required
           minLength={6}
           autoComplete="new-password"
@@ -150,6 +152,26 @@ export function RegisterForm() {
         />
         <p className="mt-2 text-xs text-ink-muted">Mínimo 6 caracteres.</p>
       </div>
+
+      <label className="flex items-start gap-3 text-sm text-ink-soft">
+        <input
+          type="checkbox"
+          required
+          checked={termsAccepted}
+          onChange={(event) => setTermsAccepted(event.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+        />
+        <span>
+          Acepto los{' '}
+          <Link
+            href="/terminos"
+            target="_blank"
+            className="font-semibold text-brand hover:underline"
+          >
+            Términos y Condiciones
+          </Link>
+        </span>
+      </label>
 
       {error && (
         <motion.p

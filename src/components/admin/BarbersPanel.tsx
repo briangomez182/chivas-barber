@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
@@ -32,6 +32,8 @@ const EMPTY_DRAFT: DraftBarber = {
   photoUrl: '',
   active: true,
 };
+
+const ALLOWED_PHOTO_TYPES = new Set(['image/png', 'image/jpeg']);
 
 /** Acordeón expandible con la gestión de portafolio de un barbero. */
 function PortfolioAccordion({ barber }: { barber: Barber }) {
@@ -87,16 +89,28 @@ function PortfolioAccordion({ barber }: { barber: Barber }) {
 
 export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
   const [draft, setDraft] = useState<DraftBarber | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resetPhotoPick = (): void => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
 
   const openNew = (): void => {
     setError(null);
+    resetPhotoPick();
     setDraft({ ...EMPTY_DRAFT });
   };
 
   const openEdit = (barber: Barber): void => {
     setError(null);
+    resetPhotoPick();
     setDraft({
       id: barber.id,
       name: barber.name,
@@ -105,6 +119,26 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
       photoUrl: barber.photoUrl,
       active: barber.active,
     });
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = event.target.files?.[0] ?? null;
+    if (!draft) return;
+
+    if (!file) {
+      resetPhotoPick();
+      return;
+    }
+    if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+      setError('Sólo se permiten imágenes PNG, JPG o JPEG');
+      resetPhotoPick();
+      return;
+    }
+
+    setError(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -124,14 +158,21 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
       };
 
       if (draft.id) {
-        const { barber } = await api.barbers.update(draft.id, payload);
+        let { barber } = await api.barbers.update(draft.id, payload);
+        if (photoFile) {
+          ({ barber } = await api.barbers.uploadPhoto(draft.id, photoFile));
+        }
         onChange(barbers.map((item) => (item.id === barber.id ? barber : item)));
       } else {
-        const { barber } = await api.barbers.create(payload);
+        let { barber } = await api.barbers.create(payload);
+        if (photoFile) {
+          ({ barber } = await api.barbers.uploadPhoto(barber.id, photoFile));
+        }
         onChange([...barbers, barber]);
       }
 
       setDraft(null);
+      resetPhotoPick();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar');
     } finally {
@@ -240,7 +281,10 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
       <Modal
         open={draft !== null}
         title={draft?.id ? 'Editar barbero' : 'Nuevo barbero'}
-        onClose={() => setDraft(null)}
+        onClose={() => {
+          setDraft(null);
+          resetPhotoPick();
+        }}
       >
         {draft && (
           <form onSubmit={save} className="space-y-5">
@@ -281,19 +325,39 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
             </Field>
 
             <Field
-              label="URL de la foto"
+              label="Foto"
               htmlFor="barber-photo"
-              hint="Dejalo vacío para mostrar las iniciales."
+              hint="PNG, JPG o JPEG, hasta 5 MB. Dejalo vacío para mostrar las iniciales."
             >
-              <input
-                id="barber-photo"
-                type="url"
-                placeholder="https://…"
-                value={draft.photoUrl}
-                onChange={(event) =>
-                  setDraft({ ...draft, photoUrl: event.target.value })
-                }
-              />
+              <div className="flex items-center gap-4">
+                <BarberAvatar
+                  name={draft.name || '—'}
+                  photoUrl={photoPreview ?? draft.photoUrl}
+                  size={56}
+                />
+                <div className="flex-1">
+                  <input
+                    ref={photoInputRef}
+                    id="barber-photo"
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    onChange={handlePhotoChange}
+                    className="w-full text-xs text-ink-soft file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-brand file:px-4 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-brand-600"
+                  />
+                  {(photoPreview || draft.photoUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetPhotoPick();
+                        setDraft({ ...draft, photoUrl: '' });
+                      }}
+                      className="mt-2 text-xs font-semibold text-ink-muted hover:text-red-500"
+                    >
+                      Quitar foto
+                    </button>
+                  )}
+                </div>
+              </div>
             </Field>
 
             <label className="flex items-center gap-3 text-sm font-medium text-ink">
@@ -317,7 +381,10 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setDraft(null)}
+                onClick={() => {
+                  setDraft(null);
+                  resetPhotoPick();
+                }}
                 className="pill-outline flex-1"
               >
                 Cancelar

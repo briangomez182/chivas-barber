@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
 import type { Barber, Profile, UserRole } from '@/lib/types';
 
@@ -262,9 +263,8 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
                   : 'Mínimo 6 caracteres.'
               }
             >
-              <input
+              <PasswordInput
                 id="user-password"
-                type="password"
                 required={!draft.id}
                 minLength={6}
                 autoComplete="new-password"

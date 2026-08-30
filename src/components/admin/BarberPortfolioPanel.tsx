@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { api } from '@/lib/api-client';
@@ -12,13 +12,14 @@ interface BarberPortfolioPanelProps {
 }
 
 const MAX_IMAGES = 5;
+const ALLOWED_PHOTO_TYPES = new Set(['image/png', 'image/jpeg']);
 
 export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPanelProps) {
   const [images, setImages] = useState<BarberPortfolioImage[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [newUrl, setNewUrl] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -34,21 +35,26 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
     void load();
   }, [load]);
 
-  const handleAdd = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    const url = newUrl.trim();
-    if (!url) return;
+  const handleAdd = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+      setError('Sólo se permiten imágenes PNG, JPG o JPEG');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setBusy(true);
     setError(null);
     try {
-      const { image } = await api.barbers.portfolio.add(barberId, url);
+      const { image } = await api.barbers.portfolio.add(barberId, file);
       setImages((prev) => [...prev, image]);
-      setNewUrl('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo agregar la imagen');
     } finally {
       setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -143,26 +149,25 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
         </div>
       )}
 
-      {/* Formulario para agregar nueva imagen */}
+      {/* Selector de archivo para agregar nueva imagen */}
       {!atMax && (
-        <form onSubmit={handleAdd} className="flex gap-3">
+        <div>
+          <label htmlFor={`portfolio-photo-${barberId}`} className="sr-only">
+            Agregar foto al portafolio
+          </label>
           <input
-            id={`portfolio-url-${barberId}`}
-            type="url"
-            placeholder="https://... URL de la imagen"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            required
-            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:ring-0"
+            ref={fileInputRef}
+            id={`portfolio-photo-${barberId}`}
+            type="file"
+            accept="image/png,image/jpeg"
+            disabled={busy}
+            onChange={handleAdd}
+            className="w-full text-xs text-ink-soft file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-brand file:px-4 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-brand-600 disabled:opacity-60"
           />
-          <button
-            type="submit"
-            disabled={busy || !newUrl.trim()}
-            className="pill-primary shrink-0"
-          >
-            {busy ? 'Agregando…' : '+ Agregar'}
-          </button>
-        </form>
+          <p className="mt-1.5 text-xs text-ink-muted">
+            {busy ? 'Subiendo…' : 'PNG, JPG o JPEG, hasta 5 MB.'}
+          </p>
+        </div>
       )}
 
       {atMax && (

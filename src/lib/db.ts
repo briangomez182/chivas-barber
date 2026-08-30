@@ -41,6 +41,7 @@ interface SettingsRow {
   deposit_amount: number;
   deposit_enabled: boolean;
   show_pagination_count: boolean;
+  show_optional_booking_fields: boolean;
 }
 
 interface BarberRow {
@@ -115,6 +116,7 @@ function toSettings(row: SettingsRow): Settings {
     depositAmount: row.deposit_amount,
     depositEnabled: row.deposit_enabled,
     showPaginationCount: row.show_pagination_count,
+    showOptionalBookingFields: row.show_optional_booking_fields,
   };
 }
 
@@ -192,7 +194,7 @@ function isMalformedId(error: { code?: string } | null): boolean {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_COLUMNS =
-  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count';
+  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count, show_optional_booking_fields';
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabaseAdmin()
@@ -220,6 +222,7 @@ export interface SettingsPatch {
   depositAmount?: number;
   depositEnabled?: boolean;
   showPaginationCount?: boolean;
+  showOptionalBookingFields?: boolean;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
@@ -235,6 +238,9 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   if (patch.depositEnabled !== undefined) row.deposit_enabled = patch.depositEnabled;
   if (patch.showPaginationCount !== undefined) {
     row.show_pagination_count = patch.showPaginationCount;
+  }
+  if (patch.showOptionalBookingFields !== undefined) {
+    row.show_optional_booking_fields = patch.showOptionalBookingFields;
   }
 
   if (Object.keys(row).length === 0) return getSettings();
@@ -337,6 +343,53 @@ export async function updateBarber(
   return data ? toBarber(data) : null;
 }
 
+/** Bucket público de Supabase Storage donde se guardan las fotos de barberos. */
+const BARBER_PHOTOS_BUCKET = 'barberos';
+
+/**
+ * Sube un archivo al bucket `barberos` y devuelve su URL pública. Usada por
+ * la foto de perfil (`uploadBarberPhoto`) y por el portafolio
+ * (`uploadBarberPortfolioPhoto`) — cada una arma su propio `path` dentro del
+ * bucket.
+ *
+ * Nunca se escribe al filesystem del proyecto: en un deploy serverless (ver
+ * el comentario al principio de este archivo) es de sólo lectura y efímero,
+ * así que cualquier archivo guardado ahí desaparece en la siguiente
+ * invocación. Supabase Storage es el equivalente persistente.
+ */
+async function uploadToBarberBucket(
+  path: string,
+  file: Buffer,
+  contentType: 'image/png' | 'image/jpeg',
+): Promise<string> {
+  const { error: uploadError } = await supabaseAdmin()
+    .storage.from(BARBER_PHOTOS_BUCKET)
+    .upload(path, file, { contentType, upsert: false });
+
+  if (uploadError) fail('subir imagen', uploadError);
+
+  const {
+    data: { publicUrl },
+  } = supabaseAdmin().storage.from(BARBER_PHOTOS_BUCKET).getPublicUrl(path);
+
+  return publicUrl;
+}
+
+function imageExtension(contentType: 'image/png' | 'image/jpeg'): 'png' | 'jpg' {
+  return contentType === 'image/png' ? 'png' : 'jpg';
+}
+
+/** Sube la foto de perfil de un barbero y actualiza `photo_url`. */
+export async function uploadBarberPhoto(
+  barberId: string,
+  file: Buffer,
+  contentType: 'image/png' | 'image/jpeg',
+): Promise<Barber | null> {
+  const path = `${barberId}-${Date.now()}.${imageExtension(contentType)}`;
+  const publicUrl = await uploadToBarberBucket(path, file, contentType);
+  return updateBarber(barberId, { photoUrl: publicUrl });
+}
+
 // ---------------------------------------------------------------------------
 // Portafolio de imágenes del barbero
 // ---------------------------------------------------------------------------
@@ -390,6 +443,21 @@ export async function addBarberPortfolioImage(
 
   if (error) fail('agregar imagen de portafolio', error);
   return toPortfolioImage(data);
+}
+
+/**
+ * Sube una foto de portafolio al bucket `barberos` (subcarpeta `portfolio/`,
+ * separada de las fotos de perfil) y la agrega vía `addBarberPortfolioImage`
+ * — mismo tope de {@link MAX_PORTFOLIO_IMAGES} que la carga por URL.
+ */
+export async function uploadBarberPortfolioPhoto(
+  barberId: string,
+  file: Buffer,
+  contentType: 'image/png' | 'image/jpeg',
+): Promise<BarberPortfolioImage | { error: 'MAX_IMAGES_REACHED' }> {
+  const path = `portfolio/${barberId}-${Date.now()}.${imageExtension(contentType)}`;
+  const publicUrl = await uploadToBarberBucket(path, file, contentType);
+  return addBarberPortfolioImage(barberId, publicUrl);
 }
 
 export async function deleteBarberPortfolioImage(
