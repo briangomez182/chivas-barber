@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
+import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api-client';
@@ -31,6 +32,58 @@ const EMPTY_DRAFT: DraftBarber = {
   photoUrl: '',
   active: true,
 };
+
+/** Acordeón expandible con la gestión de portafolio de un barbero. */
+function PortfolioAccordion({ barber }: { barber: Barber }) {
+  const [open, setOpen] = useState<boolean>(false);
+
+  return (
+    <div className="border-t border-gray-100 pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between py-1.5 text-left text-xs font-semibold text-ink-soft transition-colors hover:text-ink"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          Portafolio de fotos
+        </span>
+        <motion.svg
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </motion.svg>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
   const [draft, setDraft] = useState<DraftBarber | null>(null);
@@ -147,7 +200,8 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-2">
+          <div className="mt-5 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => toggleActive(barber)}
@@ -175,6 +229,10 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
                 Eliminar
               </button>
             </div>
+
+            {/* Portafolio expandible */}
+            <PortfolioAccordion barber={barber} />
+          </div>
           </motion.li>
         ))}
       </ul>

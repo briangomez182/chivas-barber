@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { EditorTurnosPanel } from '@/components/admin/EditorTurnosPanel';
-import { getBarber, listServices } from '@/lib/db';
+import { getBarber, getSettings, listServices } from '@/lib/db';
 import { getSession } from '@/lib/guard';
 
 export const metadata: Metadata = {
@@ -19,9 +19,10 @@ export default async function MisTurnosPage() {
     redirect('/login?next=/admin/mis-turnos');
   }
 
-  const [barber, services] = await Promise.all([
+  const [barber, services, settings] = await Promise.all([
     getBarber(session.barberId),
     listServices(),
+    getSettings(),
   ]);
 
   if (!barber) {
@@ -29,6 +30,11 @@ export default async function MisTurnosPage() {
   }
 
   return (
-    <EditorTurnosPanel editorName={session.name} barber={barber} services={services} />
+    <EditorTurnosPanel
+      editorName={session.name}
+      barber={barber}
+      services={services}
+      settings={settings}
+    />
   );
 }

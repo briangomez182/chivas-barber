@@ -14,7 +14,8 @@ interface RouteContext {
  * (`/booking/success|pending|failure`).
  *
  * A propósito NO expone `customerPhone`/`customerEmail`/`notes`: cualquiera
- * con el link podría consultar este endpoint.
+ * con el link podría consultar este endpoint. `customerName` sí se expone
+ * (se usa para personalizar el mensaje de WhatsApp de esta misma pantalla).
  */
 export async function GET(
   _request: Request,
@@ -41,6 +42,7 @@ export async function GET(
       status: appointment.status,
       paymentStatus: appointment.paymentStatus,
       amount: appointment.amount,
+      customerName: appointment.customerName,
       barberName: barber?.name ?? null,
       serviceName: service?.name ?? null,
     },

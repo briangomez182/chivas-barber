@@ -19,7 +19,18 @@ interface DraftService {
   name: string;
   description: string;
   durationMin: number;
-  price: number;
+  /**
+   * Texto crudo del input de precio — no un `number`. Dos motivos para no
+   * usar `type="number"` + estado numérico acá:
+   *  1) Convertir a `Number(...)` en cada tecleo y usarlo como `value`
+   *     "normaliza" el texto en cada keystroke (p. ej. "500" con el cursor
+   *     en el medio pasa a mostrar sólo "5" al borrar un dígito).
+   *  2) `type="number"` tiene comportamiento de selección/borrado
+   *     inconsistente entre navegadores. El input usa `type="text"` +
+   *     `inputMode="numeric"` y filtra no-dígitos a mano.
+   * Se parsea a number recién al guardar.
+   */
+  price: string;
   featured: boolean;
 }
 
@@ -28,7 +39,7 @@ const EMPTY_DRAFT: DraftService = {
   name: '',
   description: '',
   durationMin: 30,
-  price: 0,
+  price: '0',
   featured: false,
 };
 
@@ -49,7 +60,7 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
         name: draft.name,
         description: draft.description,
         durationMin: draft.durationMin,
-        price: draft.price,
+        price: Number(draft.price) || 0,
         featured: draft.featured,
       };
 
@@ -151,7 +162,7 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
                         name: service.name,
                         description: service.description,
                         durationMin: service.durationMin,
-                        price: service.price,
+                        price: String(service.price),
                         featured: service.featured,
                       });
                     }}
@@ -233,14 +244,15 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
               <Field label="Precio (ARS)" htmlFor="service-price">
                 <input
                   id="service-price"
-                  type="number"
-                  min={0}
-                  step={500}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                   value={draft.price}
                   onChange={(event) =>
-                    setDraft({ ...draft, price: Number(event.target.value) })
+                    setDraft({ ...draft, price: event.target.value.replace(/[^\d]/g, '') })
                   }
+                  onFocus={(event) => event.target.select()}
                 />
               </Field>
             </div>

@@ -1,7 +1,9 @@
 import type {
   Appointment,
   Barber,
+  BarberPortfolioImage,
   Profile,
+  ScheduleBlock,
   Service,
   Session,
   Settings,
@@ -16,6 +18,7 @@ interface TrackedAppointment {
   status: Appointment['status'];
   paymentStatus: string | null;
   amount: number | null;
+  customerName: string;
   barberName: string | null;
   serviceName: string | null;
 }
@@ -68,6 +71,22 @@ export const api = {
       }),
     remove: (id: string) =>
       apiFetch<{ ok: true }>(`/api/barbers/${id}`, { method: 'DELETE' }),
+    portfolio: {
+      list: (barberId: string) =>
+        apiFetch<{ images: BarberPortfolioImage[] }>(
+          `/api/barbers/${barberId}/portfolio`,
+        ),
+      add: (barberId: string, imageUrl: string) =>
+        apiFetch<{ image: BarberPortfolioImage }>(
+          `/api/barbers/${barberId}/portfolio`,
+          { method: 'POST', body: JSON.stringify({ imageUrl }) },
+        ),
+      remove: (barberId: string, imageId: string) =>
+        apiFetch<{ ok: true }>(
+          `/api/barbers/${barberId}/portfolio/${imageId}`,
+          { method: 'DELETE' },
+        ),
+    },
   },
   services: {
     list: () => apiFetch<{ services: Service[] }>('/api/services'),
@@ -105,12 +124,13 @@ export const api = {
     );
   },
   appointments: {
-    list: (date?: string, barberId?: string) => {
+    list: (date?: string, barberId?: string, page?: number) => {
       const search = new URLSearchParams();
       if (date) search.set('date', date);
       if (barberId) search.set('barberId', barberId);
+      if (page) search.set('page', String(page));
       const query = search.toString();
-      return apiFetch<{ appointments: Appointment[] }>(
+      return apiFetch<{ appointments: Appointment[]; total: number; page: number; pageSize: number }>(
         `/api/appointments${query ? `?${query}` : ''}`,
       );
     },
@@ -141,6 +161,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  /** Reserva pública sin cobro — sólo funciona con la seña deshabilitada. */
+  book: (data: Record<string, unknown>) =>
+    apiFetch<{ appointment: Appointment }>('/api/book', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  blocks: {
+    list: (date?: string, barberId?: string) => {
+      const search = new URLSearchParams();
+      if (date) search.set('date', date);
+      if (barberId) search.set('barberId', barberId);
+      const query = search.toString();
+      return apiFetch<{ blocks: ScheduleBlock[] }>(
+        `/api/blocks${query ? `?${query}` : ''}`,
+      );
+    },
+    create: (data: {
+      barberId?: string;
+      date: string;
+      startTime: string | null;
+      endTime: string | null;
+      reason?: string;
+    }) =>
+      apiFetch<{ block: ScheduleBlock }>('/api/blocks', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      apiFetch<{ ok: true }>(`/api/blocks/${id}`, { method: 'DELETE' }),
+  },
   users: {
     list: () => apiFetch<{ users: Profile[] }>('/api/users'),
     create: (data: {

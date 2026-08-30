@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getBarber, getSettings, listAppointments } from '@/lib/db';
+import { getBarber, getSettings, listAppointments, listScheduleBlocks } from '@/lib/db';
 import { buildSlots } from '@/lib/slots';
 
 export const dynamic = 'force-dynamic';
@@ -40,12 +40,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     date,
     ...(barberId ? { barberId } : {}),
   });
+  const blocks = await listScheduleBlocks({
+    date,
+    ...(barberId ? { barberId } : {}),
+  });
 
   const slots = buildSlots({
     date,
     durationMin,
     settings,
     appointments,
+    blocks,
   });
 
   return NextResponse.json({ date, barberId, durationMin, slots });

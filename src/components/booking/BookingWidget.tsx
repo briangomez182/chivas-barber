@@ -112,28 +112,40 @@ export function BookingWidget({
     setSubmitting(true);
     setError(null);
 
-    try {
-      // Crea el turno en estado "pendiente de pago" y obtiene el link de
-      // Checkout Pro de Mercado Pago. El turno recién queda confirmado
-      // cuando Mercado Pago avisa que el pago fue aprobado — por eso acá no
-      // mostramos ninguna confirmación todavía, sólo redirigimos a pagar.
-      const { checkoutUrl } = await api.checkout({
-        barberId: selectedBarberId,
-        serviceId,
-        date,
-        time,
-        durationMin,
-        customerName,
-        customerPhone,
-        customerEmail,
-        notes,
-      });
+    const payload = {
+      barberId: selectedBarberId,
+      serviceId,
+      date,
+      time,
+      durationMin,
+      customerName,
+      customerPhone,
+      customerEmail,
+      notes,
+    };
 
-      setRedirecting(true);
-      window.location.href = checkoutUrl;
+    try {
+      if (settings.depositEnabled) {
+        // Crea el turno en estado "pendiente de pago" y obtiene el link de
+        // Checkout Pro de Mercado Pago. El turno recién queda confirmado
+        // cuando Mercado Pago avisa que el pago fue aprobado — por eso acá
+        // no mostramos ninguna confirmación todavía, sólo redirigimos a
+        // pagar.
+        const { checkoutUrl } = await api.checkout(payload);
+        setRedirecting(true);
+        window.location.href = checkoutUrl;
+      } else {
+        // Sin seña configurada: el turno queda `confirmed` directo, sin
+        // pasar por Mercado Pago. Reusamos la pantalla de éxito del flujo
+        // pago (misma page, mismo botón de WhatsApp) para que el cliente
+        // pueda avisarle al local.
+        const { appointment } = await api.book(payload);
+        setRedirecting(true);
+        window.location.href = `/booking/success?external_reference=${appointment.id}`;
+      }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'No pudimos iniciar el pago',
+        cause instanceof Error ? cause.message : 'No pudimos confirmar el turno',
       );
       await loadSlots();
       setSubmitting(false);
@@ -358,21 +370,32 @@ export function BookingWidget({
                   disabled={!canSubmit}
                   className="pill-primary w-full px-8 py-3 sm:w-auto"
                 >
-                  {redirecting
-                    ? 'Redirigiendo a Mercado Pago…'
-                    : submitting
-                      ? 'Preparando el pago…'
-                      : 'Pagar seña y confirmar turno'}
+                  {settings.depositEnabled
+                    ? redirecting
+                      ? 'Redirigiendo a Mercado Pago…'
+                      : submitting
+                        ? 'Preparando el pago…'
+                        : 'Pagar seña y confirmar turno'
+                    : submitting || redirecting
+                      ? 'Confirmando turno…'
+                      : 'Confirmar turno'}
                 </button>
               </div>
 
               <p className="mt-3 text-xs text-ink-muted">
-                Al confirmar vas a ser redirigido a Mercado Pago para pagar una
-                seña de {formatPrice(settings.depositAmount)}
-                {selectedService
-                  ? ` (el resto, ${formatPrice(Math.max(selectedService.price - settings.depositAmount, 0))}, se abona en el local)`
-                  : ''}
-                . El turno queda reservado recién cuando el pago se aprueba.
+                {settings.depositEnabled ? (
+                  <>
+                    Al confirmar vas a ser redirigido a Mercado Pago para pagar
+                    una seña de {formatPrice(settings.depositAmount)}
+                    {selectedService
+                      ? ` (el resto, ${formatPrice(Math.max(selectedService.price - settings.depositAmount, 0))}, se abona en el local)`
+                      : ''}
+                    . El turno queda reservado recién cuando el pago se aprueba.
+                  </>
+                ) : (
+                  'Al confirmar, tu turno queda reservado al instante — el pago se '
+                  + 'arregla en el local. Vas a poder avisarnos por WhatsApp desde la siguiente pantalla.'
+                )}
               </p>
             </form>
           </div>
@@ -400,7 +423,9 @@ export function BookingWidget({
                 className="h-10 w-10 animate-spin rounded-full border-[3px] border-gray-200 border-t-brand"
               />
               <p className="text-sm font-semibold text-ink">
-                Te estamos redirigiendo a Mercado Pago para completar el pago…
+                {settings.depositEnabled
+                  ? 'Te estamos redirigiendo a Mercado Pago para completar el pago…'
+                  : 'Turno confirmado. Te estamos llevando a la pantalla de contacto…'}
               </p>
             </motion.div>
           </motion.div>

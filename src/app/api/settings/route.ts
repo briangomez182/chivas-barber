@@ -13,6 +13,8 @@ interface SettingsBody {
   workingDays?: number[];
   bufferMin?: number;
   depositAmount?: number;
+  depositEnabled?: boolean;
+  showPaginationCount?: boolean;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -76,6 +78,22 @@ export async function PUT(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Seña inválida' }, { status: 400 });
     }
     patch.depositAmount = Math.round(value);
+  }
+  if (body.depositEnabled !== undefined) {
+    patch.depositEnabled = Boolean(body.depositEnabled);
+  }
+  if (body.showPaginationCount !== undefined) {
+    patch.showPaginationCount = Boolean(body.showPaginationCount);
+  }
+
+  if (patch.depositEnabled) {
+    const amount = patch.depositAmount ?? (await getSettings()).depositAmount;
+    if (amount <= 0) {
+      return NextResponse.json(
+        { error: 'Ingresá el valor de la seña para poder habilitarla' },
+        { status: 400 },
+      );
+    }
   }
 
   const settings = await updateSettings(patch);

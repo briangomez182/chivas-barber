@@ -5,7 +5,7 @@ import {
   todayIso,
   weekdayOf,
 } from './date';
-import type { Appointment, Settings, Slot } from './types';
+import type { Appointment, ScheduleBlock, Settings, Slot } from './types';
 
 interface BuildSlotsInput {
   date: string;
@@ -14,6 +14,8 @@ interface BuildSlotsInput {
   settings: Settings;
   /** Turnos ya reservados para ese barbero y fecha. */
   appointments: Appointment[];
+  /** Tramos que el barbero (o el admin) marcó como no disponibles. */
+  blocks?: ScheduleBlock[];
 }
 
 interface Busy {
@@ -54,6 +56,7 @@ export function buildSlots({
   durationMin,
   settings,
   appointments,
+  blocks = [],
 }: BuildSlotsInput): Slot[] {
   const weekday = weekdayOf(date);
   if (!settings.workingDays.includes(weekday)) return [];
@@ -70,20 +73,39 @@ export function buildSlots({
       return { start, end: start + item.durationMin + buffer };
     });
 
+  const dayBlocks = blocks.filter((item) => item.date === date);
+  const allDayBlocked = dayBlocks.some((item) => item.startTime === null);
+  const blockedRanges: Busy[] = dayBlocks
+    .filter((item): item is ScheduleBlock & { startTime: string; endTime: string } =>
+      item.startTime !== null && item.endTime !== null,
+    )
+    .map((item) => ({
+      start: timeToMinutes(item.startTime),
+      end: timeToMinutes(item.endTime),
+    }));
+
   const isToday = date === todayIso();
   const currentMinutes = nowMinutes();
   const slots: Slot[] = [];
 
   for (let start = opening; start + durationMin <= closing; start += step) {
     const end = start + durationMin + buffer;
-    const overlaps = busy.some((slot) => start < slot.end && end > slot.start);
+    const overlapsAppointment = busy.some((slot) => start < slot.end && end > slot.start);
+    const overlapsBlock =
+      allDayBlocked || blockedRanges.some((slot) => start < slot.end && end > slot.start);
     const isPast = isToday && start <= currentMinutes;
 
     slots.push({
       time: minutesToTime(start),
       endTime: minutesToTime(start + durationMin),
-      available: !overlaps && !isPast,
-      reason: overlaps ? 'taken' : isPast ? 'past' : undefined,
+      available: !overlapsAppointment && !overlapsBlock && !isPast,
+      reason: overlapsAppointment
+        ? 'taken'
+        : overlapsBlock
+          ? 'blocked'
+          : isPast
+            ? 'past'
+            : undefined,
     });
   }
 

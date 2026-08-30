@@ -27,6 +27,14 @@ export type PaymentStatus =
   | 'refunded'
   | 'charged_back';
 
+export interface BarberPortfolioImage {
+  id: string;
+  barberId: string;
+  imageUrl: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface Barber {
   id: string;
   name: string;
@@ -35,6 +43,8 @@ export interface Barber {
   photoUrl: string;
   active: boolean;
   createdAt: string;
+  /** Imágenes de portafolio (hasta 5). Se popula sólo cuando se pide explícitamente. */
+  portfolioImages?: BarberPortfolioImage[];
 }
 
 export interface Service {
@@ -62,9 +72,18 @@ export interface Settings {
   bufferMin: number;
   /**
    * Seña fija en pesos que se cobra por Mercado Pago al reservar (no el
-   * precio total del servicio). El resto se abona en el local.
+   * precio total del servicio). El resto se abona en el local. Sólo se
+   * cobra si `depositEnabled` es `true`.
    */
   depositAmount: number;
+  /** Switch general del módulo de pagos: si es `false`, el checkout online queda deshabilitado sin importar `depositAmount`. */
+  depositEnabled: boolean;
+  /**
+   * Módulo Turnos: si es `true`, la paginación de la vista de turnos
+   * (admin y editor) muestra "Página X de Y · N turnos". Si es `false`,
+   * sólo se ven los botones Anterior/Siguiente.
+   */
+  showPaginationCount: boolean;
 }
 
 export interface Appointment {
@@ -112,7 +131,25 @@ export interface Slot {
   /** `HH:mm` de finalización, ya incluido el servicio. */
   endTime: string;
   available: boolean;
-  reason?: 'taken' | 'past' | 'closed';
+  reason?: 'taken' | 'past' | 'closed' | 'blocked';
+}
+
+/**
+ * Tramo de agenda que un barbero (o el admin) marca como no disponible —
+ * "me desconecto 4 horas", vacaciones, etc. No es un turno: no tiene
+ * cliente ni pago, sólo bloquea horarios en `buildSlots`.
+ */
+export interface ScheduleBlock {
+  id: string;
+  barberId: string;
+  /** Fecha local en formato `YYYY-MM-DD`. */
+  date: string;
+  /** `HH:mm`, o `null` si bloquea el día completo. */
+  startTime: string | null;
+  /** `HH:mm`, o `null` si bloquea el día completo. */
+  endTime: string | null;
+  reason: string;
+  createdAt: string;
 }
 
 /** Sesión resuelta desde Supabase Auth + el profile del usuario. */

@@ -92,6 +92,11 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
   const confirmed = appointment?.status === 'confirmed';
   const stillPending = appointment?.status === 'pending_payment';
   const cancelled = appointment?.status === 'cancelled';
+  // Turnos sin seña (ver ConfiguracionesPanel) se crean `confirmed` directo,
+  // sin pasar por Mercado Pago — no tienen `amount`, a diferencia de los
+  // pagados. Sirve para no hablar de "pago aprobado" en esta pantalla, que
+  // también se reusa para ese flujo.
+  const isFreeBooking = appointment !== null && appointment.amount === null;
 
   const tone: 'ok' | 'clock' | 'x' = confirmed ? 'ok' : cancelled ? 'x' : 'clock';
 
@@ -108,11 +113,13 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
             : 'Estamos confirmando tu pago';
 
   const description = loading
-    ? 'Un segundo, estamos verificando el estado de tu pago con Mercado Pago.'
+    ? 'Un segundo, estamos confirmando tu turno.'
     : notFound
       ? 'El link no tiene un turno asociado válido. Si ya pagaste, escribinos por WhatsApp con tu comprobante y lo confirmamos a mano.'
       : confirmed
-        ? 'Tu pago fue aprobado y el horario quedó reservado. Te esperamos.'
+        ? isFreeBooking
+          ? 'Tu turno quedó reservado. Te esperamos — cualquier duda, escribinos por WhatsApp.'
+          : 'Tu pago fue aprobado y el horario quedó reservado. Te esperamos.'
         : cancelled
           ? 'El pago fue rechazado o cancelado. El horario quedó liberado — podés intentar de nuevo.'
           : stillPending
@@ -190,7 +197,7 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
           <a
             href={whatsappLink(
               confirmed && appointment
-                ? `Hola, reservé un turno el ${appointment.date} a las ${appointment.time}.`
+                ? `Hola, mi nombre es ${appointment.customerName} y reservé un turno con ${appointment.barberName} el día ${appointment.date} a las ${appointment.time}.`
                 : 'Hola, tengo una consulta sobre un pago de un turno.',
             )}
             target="_blank"

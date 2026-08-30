@@ -11,7 +11,7 @@ import type { Barber, Service, Settings } from '@/lib/types';
 
 import { AppointmentsPanel } from './AppointmentsPanel';
 import { BarbersPanel } from './BarbersPanel';
-import { PaymentsPanel } from './PaymentsPanel';
+import { ConfiguracionesPanel } from './ConfiguracionesPanel';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
 import { ServicesPanel } from './ServicesPanel';
 import { UsersPanel } from './UsersPanel';
@@ -23,15 +23,21 @@ interface AdminDashboardProps {
   initialSettings: Settings;
 }
 
-type TabId = 'turnos' | 'barberos' | 'servicios' | 'agenda' | 'usuarios' | 'pagos';
+type TabId =
+  | 'turnos'
+  | 'barberos'
+  | 'servicios'
+  | 'agenda'
+  | 'usuarios'
+  | 'configuraciones';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
   { id: 'barberos', label: 'Barberos' },
   { id: 'servicios', label: 'Servicios' },
-  { id: 'agenda', label: 'Configuración' },
+  { id: 'agenda', label: 'Agenda' },
   { id: 'usuarios', label: 'Usuarios' },
-  { id: 'pagos', label: 'Pagos' },
+  { id: 'configuraciones', label: 'Configuraciones' },
 ];
 
 export function AdminDashboard({
@@ -117,7 +123,7 @@ export function AdminDashboard({
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             {tab === 'turnos' && (
-              <AppointmentsPanel barbers={barbers} services={services} />
+              <AppointmentsPanel barbers={barbers} services={services} settings={settings} />
             )}
             {tab === 'barberos' && (
               <BarbersPanel barbers={barbers} onChange={setBarbers} />
@@ -129,8 +135,8 @@ export function AdminDashboard({
               <ScheduleSettingsPanel settings={settings} onChange={setSettings} />
             )}
             {tab === 'usuarios' && <UsersPanel barbers={barbers} />}
-            {tab === 'pagos' && (
-              <PaymentsPanel settings={settings} onChange={setSettings} />
+            {tab === 'configuraciones' && (
+              <ConfiguracionesPanel settings={settings} onChange={setSettings} />
             )}
           </motion.div>
         </AnimatePresence>

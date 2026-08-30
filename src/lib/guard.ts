@@ -83,3 +83,32 @@ export function requireStaff(): Promise<
 > {
   return requireRole(['admin', 'editor']);
 }
+
+/**
+ * Admin (acceso total) o editor del propio barbero (`barberId`).
+ * Devuelve la sesión o una `NextResponse` 401/403.
+ */
+export async function requireAdminOrEditor(
+  barberId: string,
+): Promise<{ session: Session } | { response: NextResponse }> {
+  const session = await getSession();
+
+  if (!session) {
+    return {
+      response: NextResponse.json({ error: 'No autenticado' }, { status: 401 }),
+    };
+  }
+
+  if (session.role === 'admin') return { session };
+
+  if (session.role === 'editor' && session.barberId === barberId) {
+    return { session };
+  }
+
+  return {
+    response: NextResponse.json(
+      { error: 'No tenés permisos para esta acción' },
+      { status: 403 },
+    ),
+  };
+}

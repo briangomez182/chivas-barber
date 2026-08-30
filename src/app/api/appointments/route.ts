@@ -5,7 +5,7 @@ import {
   getBarber,
   getService,
   getSettings,
-  listAppointments,
+  listAppointmentsPage,
 } from '@/lib/db';
 import { getSession, requireStaff } from '@/lib/guard';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -27,10 +27,13 @@ interface AppointmentBody {
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+/** Tope de turnos por página — ni admin ni editor pueden pedir más. */
+const PAGE_SIZE = 20;
+
 /**
- * GET /api/appointments — listado (staff). `?date=` filtra por día.
- * `?barberId=` filtra por barbero (lo usa el admin) — un editor lo ignora:
- * siempre ve sólo su propio barbero.
+ * GET /api/appointments — listado paginado (staff), 20 turnos por página.
+ * `?date=` filtra por día. `?barberId=` filtra por barbero (lo usa el admin)
+ * — un editor lo ignora: siempre ve sólo su propio barbero. `?page=` (1-based).
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const session = await getSession();
@@ -40,23 +43,30 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date');
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
 
   if (session.role === 'editor') {
     const supabase = await createServerSupabaseClient();
-    const appointments = await listAppointments(
+    const { appointments, total } = await listAppointmentsPage(
       { ...(date ? { date } : {}), barberId: session.barberId ?? undefined },
+      page,
+      PAGE_SIZE,
       supabase,
     );
-    return NextResponse.json({ appointments });
+    return NextResponse.json({ appointments, total, page, pageSize: PAGE_SIZE });
   }
 
   const barberId = searchParams.get('barberId');
-  const appointments = await listAppointments({
-    ...(date ? { date } : {}),
-    ...(barberId ? { barberId } : {}),
-  });
+  const { appointments, total } = await listAppointmentsPage(
+    {
+      ...(date ? { date } : {}),
+      ...(barberId ? { barberId } : {}),
+    },
+    page,
+    PAGE_SIZE,
+  );
 
-  return NextResponse.json({ appointments });
+  return NextResponse.json({ appointments, total, page, pageSize: PAGE_SIZE });
 }
 
 /**

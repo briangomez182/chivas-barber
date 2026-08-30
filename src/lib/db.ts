@@ -6,8 +6,10 @@ import {
   type Appointment,
   type AppointmentStatus,
   type Barber,
+  type BarberPortfolioImage,
   type PaymentStatus,
   type Profile,
+  type ScheduleBlock,
   type Service,
   type Settings,
   type SlotInterval,
@@ -37,6 +39,8 @@ interface SettingsRow {
   working_days: number[];
   buffer_min: number;
   deposit_amount: number;
+  deposit_enabled: boolean;
+  show_pagination_count: boolean;
 }
 
 interface BarberRow {
@@ -77,6 +81,24 @@ interface AppointmentRow {
   created_at: string;
 }
 
+interface BarberPortfolioImageRow {
+  id: string;
+  barber_id: string;
+  image_url: string;
+  sort_order: number;
+  created_at: string;
+}
+
+interface ScheduleBlockRow {
+  id: string;
+  barber_id: string;
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+  reason: string;
+  created_at: string;
+}
+
 function isSlotInterval(value: number): value is SlotInterval {
   return (SLOT_INTERVALS as readonly number[]).includes(value);
 }
@@ -91,6 +113,8 @@ function toSettings(row: SettingsRow): Settings {
     workingDays: row.working_days,
     bufferMin: row.buffer_min,
     depositAmount: row.deposit_amount,
+    depositEnabled: row.deposit_enabled,
+    showPaginationCount: row.show_pagination_count,
   };
 }
 
@@ -138,6 +162,18 @@ function toAppointment(row: AppointmentRow): Appointment {
   };
 }
 
+function toScheduleBlock(row: ScheduleBlockRow): ScheduleBlock {
+  return {
+    id: row.id,
+    barberId: row.barber_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    reason: row.reason,
+    createdAt: row.created_at,
+  };
+}
+
 /** Convierte el error de supabase-js en una excepción con contexto. */
 function fail(operation: string, error: { message: string }): never {
   throw new Error(`Supabase — ${operation}: ${error.message}`);
@@ -156,7 +192,7 @@ function isMalformedId(error: { code?: string } | null): boolean {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_COLUMNS =
-  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount';
+  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count';
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabaseAdmin()
@@ -182,6 +218,8 @@ export interface SettingsPatch {
   workingDays?: number[];
   bufferMin?: number;
   depositAmount?: number;
+  depositEnabled?: boolean;
+  showPaginationCount?: boolean;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
@@ -194,6 +232,10 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   if (patch.workingDays !== undefined) row.working_days = patch.workingDays;
   if (patch.bufferMin !== undefined) row.buffer_min = patch.bufferMin;
   if (patch.depositAmount !== undefined) row.deposit_amount = patch.depositAmount;
+  if (patch.depositEnabled !== undefined) row.deposit_enabled = patch.depositEnabled;
+  if (patch.showPaginationCount !== undefined) {
+    row.show_pagination_count = patch.showPaginationCount;
+  }
 
   if (Object.keys(row).length === 0) return getSettings();
 
@@ -294,6 +336,101 @@ export async function updateBarber(
   }
   return data ? toBarber(data) : null;
 }
+
+// ---------------------------------------------------------------------------
+// Portafolio de imágenes del barbero
+// ---------------------------------------------------------------------------
+
+const PORTFOLIO_IMAGE_COLUMNS = 'id, barber_id, image_url, sort_order, created_at';
+const MAX_PORTFOLIO_IMAGES = 5;
+
+function toPortfolioImage(row: BarberPortfolioImageRow): BarberPortfolioImage {
+  return {
+    id: row.id,
+    barberId: row.barber_id,
+    imageUrl: row.image_url,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+  };
+}
+
+export async function listBarberPortfolioImages(
+  barberId: string,
+): Promise<BarberPortfolioImage[]> {
+  const { data, error } = await supabaseAdmin()
+    .from('barber_portfolio_images')
+    .select(PORTFOLIO_IMAGE_COLUMNS)
+    .eq('barber_id', barberId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+    .returns<BarberPortfolioImageRow[]>();
+
+  if (error) fail('listar imágenes de portafolio', error);
+  return (data ?? []).map(toPortfolioImage);
+}
+
+export async function addBarberPortfolioImage(
+  barberId: string,
+  imageUrl: string,
+): Promise<BarberPortfolioImage | { error: 'MAX_IMAGES_REACHED' }> {
+  // Contamos cuántas imágenes tiene ya este barbero.
+  const { count, error: countError } = await supabaseAdmin()
+    .from('barber_portfolio_images')
+    .select('id', { count: 'exact', head: true })
+    .eq('barber_id', barberId);
+
+  if (countError) fail('contar imágenes de portafolio', countError);
+  if ((count ?? 0) >= MAX_PORTFOLIO_IMAGES) return { error: 'MAX_IMAGES_REACHED' };
+
+  const { data, error } = await supabaseAdmin()
+    .from('barber_portfolio_images')
+    .insert({ barber_id: barberId, image_url: imageUrl, sort_order: count ?? 0 })
+    .select(PORTFOLIO_IMAGE_COLUMNS)
+    .single<BarberPortfolioImageRow>();
+
+  if (error) fail('agregar imagen de portafolio', error);
+  return toPortfolioImage(data);
+}
+
+export async function deleteBarberPortfolioImage(
+  id: string,
+  barberId: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from('barber_portfolio_images')
+    .delete()
+    .eq('id', id)
+    .eq('barber_id', barberId)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    if (isMalformedId(error)) return false;
+    fail('eliminar imagen de portafolio', error);
+  }
+  return data !== null;
+}
+
+/**
+ * Reordena las imágenes de portafolio de un barbero actualizando `sort_order`
+ * según la posición en el array `ids` recibido.
+ */
+export async function reorderBarberPortfolioImages(
+  barberId: string,
+  ids: string[],
+): Promise<void> {
+  await Promise.all(
+    ids.map((id, index) =>
+      supabaseAdmin()
+        .from('barber_portfolio_images')
+        .update({ sort_order: index })
+        .eq('id', id)
+        .eq('barber_id', barberId),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 /** Los turnos del barbero se borran solos: `on delete cascade` en el esquema. */
 export async function deleteBarber(id: string): Promise<boolean> {
@@ -447,6 +584,41 @@ export async function listAppointments(
   if (error) fail('listar turnos', error);
 
   return (data ?? []).map(toAppointment);
+}
+
+export interface AppointmentPage {
+  appointments: Appointment[];
+  total: number;
+}
+
+/**
+ * Igual que `listAppointments`, pero paginado — usada por la vista de
+ * turnos de admin/editor, que no necesita traer todo de una. `page` empieza
+ * en 1.
+ */
+export async function listAppointmentsPage(
+  filter: AppointmentFilter = {},
+  page: number,
+  pageSize: number,
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<AppointmentPage> {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = client
+    .from('appointments')
+    .select(APPOINTMENT_COLUMNS, { count: 'exact' })
+    .order('date', { ascending: true })
+    .order('time', { ascending: true })
+    .range(from, to);
+
+  if (filter.date) query = query.eq('date', filter.date);
+  if (filter.barberId) query = query.eq('barber_id', filter.barberId);
+
+  const { data, error, count } = await query.returns<AppointmentRow[]>();
+  if (error) fail('listar turnos', error);
+
+  return { appointments: (data ?? []).map(toAppointment), total: count ?? 0 };
 }
 
 export async function getAppointment(
@@ -672,6 +844,91 @@ export async function deleteAppointment(id: string): Promise<boolean> {
   if (error) {
     if (isMalformedId(error)) return false;
     fail('eliminar turno', error);
+  }
+  return data !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Bloqueos de agenda
+//
+// Mismo patrón que la sección de Turnos: cliente `SupabaseClient` opcional
+// (default = admin). Rutas de admin no lo pasan; rutas de editor pasan el
+// cliente de la sesión para que RLS acote a su propio barbero de verdad.
+// ---------------------------------------------------------------------------
+
+const SCHEDULE_BLOCK_COLUMNS = 'id, barber_id, date, start_time, end_time, reason, created_at';
+
+export interface ScheduleBlockFilter {
+  barberId?: string;
+  date?: string;
+}
+
+export async function listScheduleBlocks(
+  filter: ScheduleBlockFilter = {},
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<ScheduleBlock[]> {
+  let query = client
+    .from('schedule_blocks')
+    .select(SCHEDULE_BLOCK_COLUMNS)
+    .order('date', { ascending: true });
+
+  if (filter.barberId) query = query.eq('barber_id', filter.barberId);
+  if (filter.date) query = query.eq('date', filter.date);
+
+  const { data, error } = await query.returns<ScheduleBlockRow[]>();
+  if (error) fail('listar bloqueos', error);
+
+  return (data ?? []).map(toScheduleBlock);
+}
+
+export interface ScheduleBlockInput {
+  barberId: string;
+  date: string;
+  /** `null` en ambos = bloquea el día completo. */
+  startTime: string | null;
+  endTime: string | null;
+  reason: string;
+}
+
+export async function createScheduleBlock(
+  input: ScheduleBlockInput,
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<ScheduleBlock> {
+  const { data, error } = await client
+    .from('schedule_blocks')
+    .insert({
+      barber_id: input.barberId,
+      date: input.date,
+      start_time: input.startTime,
+      end_time: input.endTime,
+      reason: input.reason,
+    })
+    .select(SCHEDULE_BLOCK_COLUMNS)
+    .single<ScheduleBlockRow>();
+
+  if (error) fail('crear bloqueo', error);
+  return toScheduleBlock(data);
+}
+
+/**
+ * Borra un bloqueo (el barbero "vuelve antes" de lo planeado). Con el
+ * cliente de sesión de un editor, RLS ya le impide borrar bloqueos de otro
+ * barbero — acá simplemente no encuentra la fila y devuelve `false`.
+ */
+export async function deleteScheduleBlock(
+  id: string,
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('schedule_blocks')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    if (isMalformedId(error)) return false;
+    fail('eliminar bloqueo', error);
   }
   return data !== null;
 }

@@ -8,14 +8,17 @@ import { motion } from 'framer-motion';
 import { Field } from '@/components/ui/Field';
 import { Logo } from '@/components/layout/Logo';
 import { Modal } from '@/components/ui/Modal';
+import { Toast } from '@/components/ui/Toast';
+import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
 import { api } from '@/lib/api-client';
 import { formatDuration, formatLongDate, todayIso } from '@/lib/date';
-import type { Appointment, Barber, Service } from '@/lib/types';
+import type { Appointment, Barber, ScheduleBlock, Service, Settings } from '@/lib/types';
 
 interface EditorTurnosPanelProps {
   editorName: string;
   barber: Barber;
   services: Service[];
+  settings: Settings;
 }
 
 const STATUS_STYLES: Record<Appointment['status'], string> = {
@@ -58,30 +61,88 @@ const EMPTY_NEW: NewDraft = {
   notes: '',
 };
 
-export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnosPanelProps) {
+interface BlockDraft {
+  date: string;
+  allDay: boolean;
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
+const EMPTY_BLOCK: BlockDraft = {
+  date: todayIso(),
+  allDay: false,
+  startTime: '',
+  endTime: '',
+  reason: '',
+};
+
+export function EditorTurnosPanel({
+  editorName,
+  barber,
+  services,
+  settings,
+}: EditorTurnosPanelProps) {
   const router = useRouter();
 
   const [date, setDate] = useState<string>(todayIso());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(1);
+  const [total, setTotal] = useState<number>(0);
+  const PAGE_SIZE = 20;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const [reschedule, setReschedule] = useState<RescheduleDraft | null>(null);
   const [newDraft, setNewDraft] = useState<NewDraft | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+  const [loadingBlocks, setLoadingBlocks] = useState<boolean>(true);
+  const [blockDraft, setBlockDraft] = useState<BlockDraft | null>(null);
+  const [blockError, setBlockError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
-      const { appointments: list } = await api.appointments.list(date);
+      const { appointments: list, total: count } = await api.appointments.list(
+        date,
+        undefined,
+        page,
+      );
       setAppointments(list);
+      setTotal(count);
     } finally {
       setLoading(false);
+    }
+  }, [date, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [date]);
+
+  const loadBlocks = useCallback(async (): Promise<void> => {
+    setLoadingBlocks(true);
+    try {
+      const { blocks: list } = await api.blocks.list(date);
+      setBlocks(list);
+    } finally {
+      setLoadingBlocks(false);
     }
   }, [date]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    void loadBlocks();
+  }, [loadBlocks]);
 
   const logout = async (): Promise<void> => {
     await api.auth.logout();
@@ -150,6 +211,39 @@ export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnos
     }
   };
 
+  const saveBlock = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!blockDraft) return;
+
+    setBusy(true);
+    setBlockError(null);
+    try {
+      await api.blocks.create({
+        date: blockDraft.date,
+        startTime: blockDraft.allDay ? null : blockDraft.startTime,
+        endTime: blockDraft.allDay ? null : blockDraft.endTime,
+        reason: blockDraft.reason,
+      });
+      const schedule = blockDraft.allDay
+        ? 'todo el día'
+        : `de ${blockDraft.startTime} a ${blockDraft.endTime}`;
+      setToast(
+        `${barber.name} tiene bloqueado ${schedule} el ${formatLongDate(blockDraft.date)} por: ${blockDraft.reason}`,
+      );
+      setBlockDraft(null);
+      if (blockDraft.date === date) void loadBlocks();
+    } catch (cause) {
+      setBlockError(cause instanceof Error ? cause.message : 'No se pudo bloquear el horario');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeBlock = async (block: ScheduleBlock): Promise<void> => {
+    await api.blocks.remove(block.id);
+    setBlocks((current) => current.filter((item) => item.id !== block.id));
+  };
+
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/85 backdrop-blur-xl">
@@ -185,7 +279,9 @@ export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnos
               >
                 Mis turnos
               </h1>
-              <p className="mt-1 text-sm text-ink-soft">{formatLongDate(date)}</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                {date ? formatLongDate(date) : 'Todas las fechas'}
+              </p>
             </div>
 
             <div className="flex items-end gap-3">
@@ -201,7 +297,7 @@ export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnos
               />
               <button
                 type="button"
-                onClick={() => setNewDraft({ ...EMPTY_NEW, date })}
+                onClick={() => setNewDraft({ ...EMPTY_NEW, date: date || todayIso() })}
                 className="pill-primary"
               >
                 + Turno manual
@@ -308,6 +404,131 @@ export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnos
                   ))}
               </tbody>
             </table>
+          </div>
+
+          {total > 0 && (
+            <div
+              className={`mt-4 flex items-center gap-2 text-sm text-ink-soft ${
+                settings.showPaginationCount ? 'justify-center' : 'justify-end'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+                className="pill-outline px-4 py-1.5 text-xs disabled:opacity-40"
+              >
+                Anterior
+              </button>
+
+              {settings.showPaginationCount && (
+                <ul className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
+                    <li key={number}>
+                      <button
+                        type="button"
+                        onClick={() => setPage(number)}
+                        aria-current={number === page ? 'page' : undefined}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                          number === page
+                            ? 'bg-brand text-white shadow-brand'
+                            : 'text-ink-soft hover:text-ink'
+                        }`}
+                      >
+                        {number}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page >= totalPages}
+                className="pill-outline px-4 py-1.5 text-xs disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section aria-labelledby="editor-blocks-title" className="mt-12">
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2
+                id="editor-blocks-title"
+                className="text-xl font-extrabold tracking-[-0.02em] text-ink"
+              >
+                Disponibilidad
+              </h2>
+              <p className="mt-1 text-sm text-ink-soft">
+                Bloqueos de tu agenda para {date ? formatLongDate(date) : 'todas las fechas'} —
+                nadie puede reservarte en esos horarios.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBlockDraft({ ...EMPTY_BLOCK, date: date || todayIso() })}
+              className="pill-outline"
+            >
+              + Bloquear horario
+            </button>
+          </header>
+
+          <div className="card mt-5 divide-y divide-gray-100">
+            {loadingBlocks && (
+              <p className="px-6 py-6 text-center text-sm text-ink-muted">Cargando…</p>
+            )}
+            {!loadingBlocks && blocks.length === 0 && (
+              <p className="px-6 py-6 text-center text-sm text-ink-soft">
+                No tenés bloqueos para esta fecha.
+              </p>
+            )}
+            {!loadingBlocks &&
+              blocks.map((block) => (
+                <div
+                  key={block.id}
+                  className="flex items-center justify-between gap-4 px-6 py-4"
+                >
+                  <div>
+                    <p className="font-semibold text-ink">
+                      {block.startTime && block.endTime
+                        ? `${block.startTime} – ${block.endTime}`
+                        : 'Día completo'}
+                    </p>
+                    {block.reason && (
+                      <p className="text-xs text-ink-muted">{block.reason}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeBlock(block)}
+                    className="pill-ghost px-3 py-1.5 text-xs"
+                  >
+                    Desbloquear
+                  </button>
+                </div>
+              ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="editor-portfolio-title" className="mt-12">
+          <header>
+            <h2
+              id="editor-portfolio-title"
+              className="text-xl font-extrabold tracking-[-0.02em] text-ink"
+            >
+              Mi portafolio
+            </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              Estas fotos aparecen en la página principal cuando los clientes pasan el mouse sobre tu tarjeta.
+            </p>
+          </header>
+
+          <div className="card mt-5 p-6">
+            <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
           </div>
         </section>
       </main>
@@ -453,6 +674,101 @@ export function EditorTurnosPanel({ editorName, barber, services }: EditorTurnos
           </form>
         )}
       </Modal>
+
+      <Modal
+        open={blockDraft !== null}
+        title="Bloquear horario"
+        onClose={() => setBlockDraft(null)}
+      >
+        {blockDraft && (
+          <form onSubmit={saveBlock} className="space-y-5">
+            <Field label="Fecha" htmlFor="block-date">
+              <input
+                id="block-date"
+                type="date"
+                required
+                value={blockDraft.date}
+                onChange={(event) =>
+                  setBlockDraft({ ...blockDraft, date: event.target.value })
+                }
+              />
+            </Field>
+
+            <label className="flex items-center gap-3 text-sm font-medium text-ink">
+              <input
+                type="checkbox"
+                checked={blockDraft.allDay}
+                onChange={(event) =>
+                  setBlockDraft({ ...blockDraft, allDay: event.target.checked })
+                }
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+              />
+              Bloquear el día completo
+            </label>
+
+            {!blockDraft.allDay && (
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Desde" htmlFor="block-start">
+                  <input
+                    id="block-start"
+                    type="time"
+                    required={!blockDraft.allDay}
+                    value={blockDraft.startTime}
+                    onChange={(event) =>
+                      setBlockDraft({ ...blockDraft, startTime: event.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Hasta" htmlFor="block-end">
+                  <input
+                    id="block-end"
+                    type="time"
+                    required={!blockDraft.allDay}
+                    value={blockDraft.endTime}
+                    onChange={(event) =>
+                      setBlockDraft({ ...blockDraft, endTime: event.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+            )}
+
+            <Field label="Motivo" htmlFor="block-reason">
+              <input
+                id="block-reason"
+                type="text"
+                required
+                placeholder="Almuerzo, trámite…"
+                value={blockDraft.reason}
+                onChange={(event) =>
+                  setBlockDraft({ ...blockDraft, reason: event.target.value })
+                }
+              />
+            </Field>
+
+            {blockError && (
+              <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+                {blockError}
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setBlockDraft(null)}
+                className="pill-outline flex-1"
+              >
+                Cancelar
+              </button>
+              <button type="submit" disabled={busy} className="pill-primary flex-1">
+                {busy ? 'Guardando…' : 'Bloquear'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

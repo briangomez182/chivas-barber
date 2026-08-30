@@ -82,14 +82,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Se cobra la seña configurada por el admin (Pagos), no el precio del
-  // servicio — el resto se abona en el local.
+  // Se cobra la seña configurada por el admin (Configuraciones › Pagos), no
+  // el precio del servicio — el resto se abona en el local.
   const settings = await getSettings();
   const amount = settings.depositAmount;
 
-  if (amount <= 0) {
+  if (!settings.depositEnabled || amount <= 0) {
     return NextResponse.json(
-      { error: 'Todavía no se configuró la seña a cobrar (sección Pagos del panel admin)' },
+      { error: 'El cobro de seña está deshabilitado (sección Configuraciones del panel admin)' },
       { status: 422 },
     );
   }

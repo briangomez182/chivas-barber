@@ -4,7 +4,7 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { BookingExperience } from '@/components/sections/BookingExperience';
 import { LocationSection } from '@/components/sections/LocationSection';
 import { ServicesSection } from '@/components/sections/ServicesSection';
-import { getSettings, listBarbers, listServices } from '@/lib/db';
+import { getSettings, listBarberPortfolioImages, listBarbers, listServices } from '@/lib/db';
 
 /** Los datos cambian con cada reserva: la home siempre se renderiza al vuelo. */
 export const dynamic = 'force-dynamic';
@@ -16,6 +16,16 @@ export default async function HomePage() {
     getSettings(),
   ]);
 
+  // Cargamos las imágenes de portafolio de cada barbero en paralelo.
+  const portfolioByBarber = await Promise.all(
+    barbers.map((barber) => listBarberPortfolioImages(barber.id)),
+  );
+
+  const barbersWithPortfolio = barbers.map((barber, index) => ({
+    ...barber,
+    portfolioImages: portfolioByBarber[index],
+  }));
+
   return (
     <>
       <SiteHeader />
@@ -24,7 +34,7 @@ export default async function HomePage() {
         <Hero />
         <ServicesSection services={services} />
         <BookingExperience
-          barbers={barbers}
+          barbers={barbersWithPortfolio}
           services={services}
           settings={settings}
         />
