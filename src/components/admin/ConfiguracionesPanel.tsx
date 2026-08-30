@@ -45,9 +45,10 @@ function SwitchRow({ id, label, hint, checked, onChange }: SwitchRowProps) {
 }
 
 /**
- * Configuraciones generales y chicas del proyecto, agrupadas por módulo:
- * Pagos (reemplaza a la vieja sección "Pagos" del panel) y Turnos. Si
- * aparecen más parámetros sueltos, se suman acá como nuevos módulos.
+ * Configuraciones generales y chicas del proyecto, agrupadas por módulo en
+ * una grilla de 2 columnas (una sola en mobile). Cada módulo nuevo se agrega
+ * como una tarjeta más al final del grid — se acomoda solo, no hace falta
+ * reordenar nada.
  */
 export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPanelProps) {
   const [depositEnabled, setDepositEnabled] = useState<boolean>(settings.depositEnabled);
@@ -109,101 +110,108 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
         </p>
       </header>
 
-      <form onSubmit={save} className="mt-7 max-w-md space-y-6">
-        <div className="card p-7">
-          <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
-            Pagos
-          </h3>
+      <form onSubmit={save} className="mt-7 max-w-3xl">
+        {/*
+          Grilla de 2 columnas al 50% (una sola en mobile). Cada módulo nuevo
+          se agrega como una `<div className="card">` más al final de este
+          grid — el layout se acomoda solo, no hace falta tocar nada más.
+        */}
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="card p-7">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Pagos
+            </h3>
 
-          <div className="mt-4">
-            <SwitchRow
-              id="deposit-enabled"
-              label="Cobrar seña online"
-              hint="Si está apagado, las reservas online no piden pago por adelantado."
-              checked={depositEnabled}
-              onChange={setDepositEnabled}
-            />
-          </div>
-
-          {depositEnabled && (
-            <Field
-              className="mt-6"
-              label="Seña (ARS)"
-              htmlFor="deposit-amount"
-              hint={
-                depositAmount > 0
-                  ? `Se cobra ${formatPrice(depositAmount)} al confirmar el turno online.`
-                  : 'Ingresá un monto mayor a 0 para poder guardar.'
-              }
-            >
-              <input
-                id="deposit-amount"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                required
-                value={depositAmountText}
-                onChange={(event) =>
-                  setDepositAmountText(event.target.value.replace(/[^\d]/g, ''))
-                }
-                onFocus={(event) => event.target.select()}
+            <div className="mt-4">
+              <SwitchRow
+                id="deposit-enabled"
+                label="Cobrar seña online"
+                hint="Si está apagado, las reservas online no piden pago por adelantado."
+                checked={depositEnabled}
+                onChange={setDepositEnabled}
               />
-            </Field>
-          )}
-        </div>
+            </div>
 
-        <div className="card p-7">
-          <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
-            Turnos
-          </h3>
-
-          <div className="mt-4">
-            <SwitchRow
-              id="show-pagination-count"
-              label="Mostrar cantidad de páginas en la paginación"
-              hint={
-                showPaginationCount
-                  ? 'Se ve "Página X de Y · N turnos" junto a Anterior/Siguiente.'
-                  : 'Sólo se ven los botones Anterior/Siguiente, sin el detalle de páginas.'
-              }
-              checked={showPaginationCount}
-              onChange={setShowPaginationCount}
-            />
+            {depositEnabled && (
+              <Field
+                className="mt-6"
+                label="Seña (ARS)"
+                htmlFor="deposit-amount"
+                hint={
+                  depositAmount > 0
+                    ? `Se cobra ${formatPrice(depositAmount)} al confirmar el turno online.`
+                    : 'Ingresá un monto mayor a 0 para poder guardar.'
+                }
+              >
+                <input
+                  id="deposit-amount"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  value={depositAmountText}
+                  onChange={(event) =>
+                    setDepositAmountText(event.target.value.replace(/[^\d]/g, ''))
+                  }
+                  onFocus={(event) => event.target.select()}
+                />
+              </Field>
+            )}
           </div>
-        </div>
 
-        <div className="card p-7">
-          <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
-            Formulario de turnos
-          </h3>
+          <div className="card p-7">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Turnos
+            </h3>
 
-          <div className="mt-4">
-            <SwitchRow
-              id="show-optional-booking-fields"
-              label="Mostrar campos de email y comentarios"
-              hint={
-                showOptionalBookingFields
-                  ? 'El formulario público de reserva pide email y comentarios (ambos opcionales).'
-                  : 'El formulario público de reserva sólo pide nombre y teléfono.'
-              }
-              checked={showOptionalBookingFields}
-              onChange={setShowOptionalBookingFields}
-            />
+            <div className="mt-4">
+              <SwitchRow
+                id="show-pagination-count"
+                label="Mostrar cantidad de páginas en la paginación"
+                hint={
+                  showPaginationCount
+                    ? 'Se ve "Página X de Y · N turnos" junto a Anterior/Siguiente.'
+                    : 'Sólo se ven los botones Anterior/Siguiente, sin el detalle de páginas.'
+                }
+                checked={showPaginationCount}
+                onChange={setShowPaginationCount}
+              />
+            </div>
+          </div>
+
+          <div className="card p-7">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Formulario de turnos
+            </h3>
+
+            <div className="mt-4">
+              <SwitchRow
+                id="show-optional-booking-fields"
+                label="Mostrar campos de email y comentarios"
+                hint={
+                  showOptionalBookingFields
+                    ? 'El formulario público de reserva pide email y comentarios (ambos opcionales).'
+                    : 'El formulario público de reserva sólo pide nombre y teléfono.'
+                }
+                checked={showOptionalBookingFields}
+                onChange={setShowOptionalBookingFields}
+              />
+            </div>
           </div>
         </div>
 
         {message && (
-          <p className="rounded-xl bg-brand-50 px-4 py-3 text-sm font-medium text-brand">
+          <p className="mt-6 rounded-xl bg-brand-50 px-4 py-3 text-sm font-medium text-brand">
             {message}
           </p>
         )}
         {error && (
-          <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+          <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
             {error}
           </p>
         )}
 
-        <div className="flex justify-end">
+        <div className="mt-6 flex justify-end">
           <button type="submit" disabled={busy} className="pill-primary px-8 py-3">
             {busy ? 'Guardando…' : 'Guardar'}
           </button>
