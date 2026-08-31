@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 interface RegisterBody {
@@ -17,6 +18,11 @@ interface RegisterBody {
  * forma de que este endpoint dé de alta un admin/editor.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  if (!(await checkRateLimit(`register:${ip}`, 5, 300))) {
+    return rateLimitResponse();
+  }
+
   const body = (await request.json().catch(() => ({}))) as RegisterBody;
 
   const name = body.name?.trim() ?? '';

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 interface LoginBody {
@@ -14,6 +15,11 @@ interface ProfileRow {
 
 /** POST /api/auth/login */
 export async function POST(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  if (!(await checkRateLimit(`login:${ip}`, 5, 60))) {
+    return rateLimitResponse();
+  }
+
   const body = (await request.json().catch(() => ({}))) as LoginBody;
   const email = body.email?.trim().toLowerCase() ?? '';
   const password = body.password ?? '';

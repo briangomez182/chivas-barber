@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { bookAppointment, getBarber, getService, getSettings } from '@/lib/db';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,11 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
  * directo a este endpoint.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const ip = getClientIp(request);
+  if (!(await checkRateLimit(`book:${ip}`, 10, 60))) {
+    return rateLimitResponse();
+  }
+
   const settings = await getSettings();
   if (settings.depositEnabled) {
     return NextResponse.json(
