@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
 import { Field } from '@/components/ui/Field';
+import { IconButton } from '@/components/ui/IconButton';
+import { CalendarIcon, CheckIcon, XIcon } from '@/components/ui/icons';
 import { Logo } from '@/components/layout/Logo';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
@@ -397,37 +399,35 @@ export function EditorTurnosPanel({
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
-                        {appointment.status !== 'done' && (
-                          <button
-                            type="button"
-                            onClick={() => setStatus(appointment, 'done')}
-                            className="pill-ghost px-3 py-1.5 text-xs"
-                          >
-                            Atendido
-                          </button>
-                        )}
-                        {appointment.status !== 'cancelled' && (
-                          <button
-                            type="button"
-                            onClick={() => setStatus(appointment, 'cancelled')}
-                            className="pill-ghost px-3 py-1.5 text-xs"
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setReschedule({
-                              appointment,
-                              date: appointment.date,
-                              time: appointment.time,
-                            })
-                          }
-                          className="pill-ghost px-3 py-1.5 text-xs"
-                        >
-                          Reagendar
-                        </button>
+                        <div className="inline-flex items-center gap-1">
+                          {appointment.status !== 'done' && (
+                            <IconButton
+                              label="Marcar como atendido"
+                              tone="success"
+                              icon={<CheckIcon />}
+                              onClick={() => setStatus(appointment, 'done')}
+                            />
+                          )}
+                          {appointment.status !== 'cancelled' && (
+                            <IconButton
+                              label="Cancelar turno"
+                              icon={<XIcon />}
+                              onClick={() => setStatus(appointment, 'cancelled')}
+                            />
+                          )}
+                          <IconButton
+                            label="Reagendar turno"
+                            tone="brand"
+                            icon={<CalendarIcon />}
+                            onClick={() =>
+                              setReschedule({
+                                appointment,
+                                date: appointment.date,
+                                time: appointment.time,
+                              })
+                            }
+                          />
+                        </div>
                       </td>
                     </motion.tr>
                   ))}

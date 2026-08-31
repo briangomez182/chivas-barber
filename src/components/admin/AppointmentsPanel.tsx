@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 import { Field } from '@/components/ui/Field';
+import { IconButton } from '@/components/ui/IconButton';
+import { CheckIcon, TrashIcon, XIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
@@ -357,31 +359,29 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
-                    {appointment.status !== 'done' && (
-                      <button
-                        type="button"
-                        onClick={() => setStatus(appointment, 'done')}
-                        className="pill-ghost px-3 py-1.5 text-xs"
-                      >
-                        Atendido
-                      </button>
-                    )}
-                    {appointment.status !== 'cancelled' && (
-                      <button
-                        type="button"
-                        onClick={() => setStatus(appointment, 'cancelled')}
-                        className="pill-ghost px-3 py-1.5 text-xs"
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => remove(appointment)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="inline-flex items-center gap-1">
+                      {appointment.status !== 'done' && (
+                        <IconButton
+                          label="Marcar como atendido"
+                          tone="success"
+                          icon={<CheckIcon />}
+                          onClick={() => setStatus(appointment, 'done')}
+                        />
+                      )}
+                      {appointment.status !== 'cancelled' && (
+                        <IconButton
+                          label="Cancelar turno"
+                          icon={<XIcon />}
+                          onClick={() => setStatus(appointment, 'cancelled')}
+                        />
+                      )}
+                      <IconButton
+                        label="Eliminar turno"
+                        tone="danger"
+                        icon={<TrashIcon />}
+                        onClick={() => remove(appointment)}
+                      />
+                    </div>
                   </td>
                 </motion.tr>
               ))}
