@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { CLIENT_PASSWORD_RULES, validatePassword } from '@/lib/password';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
@@ -36,11 +37,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Email inválido' }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json(
-      { error: 'La contraseña debe tener al menos 6 caracteres' },
-      { status: 400 },
-    );
+  const passwordError = validatePassword(password, CLIENT_PASSWORD_RULES);
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
 
   const supabase = await createServerSupabaseClient();

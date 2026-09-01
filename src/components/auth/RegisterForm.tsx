@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
+import { CLIENT_PASSWORD_RULES, passwordHint, validatePassword } from '@/lib/password';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -24,8 +25,15 @@ export function RegisterForm() {
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> => {
     event.preventDefault();
-    setLoading(true);
     setError(null);
+
+    const passwordError = validatePassword(password, CLIENT_PASSWORD_RULES);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const result = await api.auth.register({ name, email, phone, password });
@@ -144,13 +152,15 @@ export function RegisterForm() {
         <PasswordInput
           id="password"
           required
-          minLength={6}
+          minLength={CLIENT_PASSWORD_RULES.minLength}
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           className="mt-2"
         />
-        <p className="mt-2 text-xs text-ink-muted">Mínimo 6 caracteres.</p>
+        <p className="mt-2 text-xs text-ink-muted">
+          {passwordHint(CLIENT_PASSWORD_RULES)}
+        </p>
       </div>
 
       <label className="flex items-start gap-3 text-sm text-ink-soft">

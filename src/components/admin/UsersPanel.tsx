@@ -7,6 +7,7 @@ import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
+import { STAFF_PASSWORD_RULES, passwordHint, validatePassword } from '@/lib/password';
 import type { Barber, Profile, UserRole } from '@/lib/types';
 
 interface UsersPanelProps {
@@ -88,9 +89,12 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
       setError('Elegí el barbero al que se vincula');
       return;
     }
-    if (draft.id && draft.password && draft.password.length < 6) {
-      setError('La contraseña nueva debe tener al menos 6 caracteres');
-      return;
+    if (!draft.id || draft.password) {
+      const passwordError = validatePassword(draft.password, STAFF_PASSWORD_RULES);
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
     }
 
     setBusy(true);
@@ -260,13 +264,13 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
               hint={
                 draft.id
                   ? 'Dejalo vacío para no cambiarla.'
-                  : 'Mínimo 6 caracteres.'
+                  : passwordHint(STAFF_PASSWORD_RULES)
               }
             >
               <PasswordInput
                 id="user-password"
                 required={!draft.id}
-                minLength={6}
+                minLength={STAFF_PASSWORD_RULES.minLength}
                 autoComplete="new-password"
                 value={draft.password}
                 onChange={(event) => setDraft({ ...draft, password: event.target.value })}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createStaffUser, listStaffProfiles } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
+import { STAFF_PASSWORD_RULES, validatePassword } from '@/lib/password';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,11 +42,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (name.length < 2) {
     return NextResponse.json({ error: 'Ingresá un nombre' }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json(
-      { error: 'La contraseña debe tener al menos 6 caracteres' },
-      { status: 400 },
-    );
+  const passwordError = validatePassword(password, STAFF_PASSWORD_RULES);
+  if (passwordError) {
+    return NextResponse.json({ error: passwordError }, { status: 400 });
   }
   if (role !== 'admin' && role !== 'editor') {
     return NextResponse.json({ error: 'Rol inválido' }, { status: 400 });

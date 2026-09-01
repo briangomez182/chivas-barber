@@ -111,10 +111,11 @@ src/
 │   ├── admin/                # AdminDashboard + paneles CRUD
 │   └── ui/                   # Modal, Field, BarberAvatar
 ├── lib/
-│   ├── types.ts  db.ts  supabase.ts  slots.ts  date.ts
-│   ├── session.ts  password.ts  guard.ts
-│   ├── api-client.ts  brand.ts
-└── middleware.ts             # protege /admin (Edge Runtime)
+│   ├── types.ts  db.ts  slots.ts  date.ts
+│   ├── supabase/              # server.ts · admin.ts · middleware.ts
+│   ├── guard.ts  password.ts  rate-limit.ts
+│   ├── api-client.ts  brand.ts  mercadopago.ts
+└── middleware.ts             # protege /admin vía Supabase Auth (Edge Runtime)
 
 supabase/schema.sql           # tablas, índices, book_appointment, RLS
 scripts/seed.mjs              # carga inicial / migración desde data/db.json
@@ -159,7 +160,7 @@ servidor.
 ## Decisiones técnicas
 
 - **Persistencia**: Postgres en Supabase, vía `@supabase/supabase-js` con la
-  `service_role` key desde el servidor (`lib/supabase.ts`). `lib/db.ts` expone
+  `service_role` key desde el servidor (`lib/supabase/admin.ts`). `lib/db.ts` expone
   funciones por entidad (`listBarbers`, `bookAppointment`, …) y traduce entre
   el `snake_case` de Postgres y el `camelCase` del dominio.
 - **Reservas sin doble booking**: el chequeo de solapamiento y el `INSERT`
@@ -168,10 +169,14 @@ servidor.
   `SELECT` y el `INSERT` donde dos reservas simultáneas toman el mismo hueco.
 - **RLS**: activo en todas las tablas y sin policies, así las claves públicas
   no acceden a nada. El único camino a los datos es el servidor.
-- **Auth**: mock con cookie `httpOnly` firmada con HMAC-SHA256 vía **Web
-  Crypto**, para que el mismo código valide en Node y en el Edge Runtime del
-  middleware. Contraseñas con `scrypt` + salt. Para producción conviene
-  reemplazarlo por Auth.js / Clerk / Supabase.
+- **Auth**: Supabase Auth de punta a punta — `signInWithPassword` / `signUp`
+  en `/api/auth/login` y `/register` (`lib/supabase/server.ts`), sesión en
+  cookies `httpOnly` que gestiona `@supabase/ssr` (no hay JWT propio ni
+  hashing manual de este lado). `middleware.ts` llama a
+  `supabase.auth.getUser()` para proteger `/admin` en el Edge Runtime, y
+  `lib/guard.ts` (`requireRole` / `requireAdmin` / `requireStaff`) repite ese
+  chequeo — más el rol en `profiles` — dentro de cada Route Handler. RLS en
+  Postgres es la barrera final (ver `supabase/migrations/0002_rbac_auth.sql`).
 - **Sin `var`**: sólo `const` / `let`, con tipos explícitos en props, estados y
   valores de retorno.
 - **HTML semántico**: `header`, `nav`, `main`, `section`, `article`, `aside`,
@@ -189,12 +194,14 @@ servidor.
 
    | Variable | Valor |
    | --- | --- |
-   | `AUTH_SECRET` | `openssl rand -base64 32` |
-   | `SUPABASE_URL` | Project URL de Supabase |
+   | `NEXT_PUBLIC_SUPABASE_URL` | Project URL de Supabase |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon/publishable key de Supabase |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key de Supabase |
 
 3. Deploy. El esquema y los datos ya viven en Supabase, así que no hace falta
    ningún paso de migración en el build.
 
-Si cambiás `AUTH_SECRET` después de publicar, las sesiones abiertas se
-invalidan y todo el mundo tiene que volver a entrar.
+La sesión la firma y valida Supabase Auth con el JWT signing key propio del
+proyecto — no hay ningún secreto de sesión que rotar desde este repo. Para
+invalidar todas las sesiones abiertas, hacelo desde el dashboard de Supabase
+(**Authentication › Sessions**), no cambiando una variable de entorno acá.

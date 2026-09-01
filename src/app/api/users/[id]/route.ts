@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { deleteStaffUser, resetStaffPassword, updateProfile } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
+import { STAFF_PASSWORD_RULES, validatePassword } from '@/lib/password';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -38,11 +39,11 @@ export async function PATCH(
       { status: 400 },
     );
   }
-  if (body.password !== undefined && body.password.length < 6) {
-    return NextResponse.json(
-      { error: 'La contraseña debe tener al menos 6 caracteres' },
-      { status: 400 },
-    );
+  if (body.password !== undefined) {
+    const passwordError = validatePassword(body.password, STAFF_PASSWORD_RULES);
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 });
+    }
   }
 
   if (body.password) {
