@@ -64,6 +64,10 @@
     @apply pill text-ink-soft hover:bg-gray-100 hover:text-ink;
   }
 
+  .pill-danger {
+    @apply pill bg-red-500 text-white shadow-lg shadow-red-500/25 hover:bg-red-600 active:scale-[0.98];
+  }
+
   .section-title {
     @apply text-3xl font-extrabold tracking-[-0.03em] text-ink sm:text-4xl;
   }

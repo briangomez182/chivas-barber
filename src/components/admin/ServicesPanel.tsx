@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
+import { Toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
 import { formatDuration, formatPrice } from '@/lib/date';
 import { SLOT_INTERVALS, type Service } from '@/lib/types';
@@ -47,6 +49,9 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
   const [draft, setDraft] = useState<DraftService | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<Service | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const save = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -80,10 +85,17 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
     }
   };
 
-  const remove = async (service: Service): Promise<void> => {
-    if (!window.confirm(`¿Eliminar el servicio "${service.name}"?`)) return;
-    await api.services.remove(service.id);
-    onChange(services.filter((item) => item.id !== service.id));
+  const confirmRemove = async (): Promise<void> => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api.services.remove(toDelete.id);
+      onChange(services.filter((item) => item.id !== toDelete.id));
+      setToast(`Servicio "${toDelete.name}" eliminado`);
+      setToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -172,7 +184,7 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => remove(service)}
+                    onClick={() => setToDelete(service)}
                     className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
                   >
                     Eliminar
@@ -290,6 +302,17 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar servicio"
+        description={`¿Eliminar el servicio "${toDelete?.name}"? Esta acción no se puede deshacer.`}
+        busy={deleting}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </section>
   );
 }

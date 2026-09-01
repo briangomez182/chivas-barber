@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
+import { Toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
 import type { Barber } from '@/lib/types';
 
@@ -93,6 +95,9 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<Barber | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+  const [toast, setToast] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const resetPhotoPick = (): void => {
@@ -180,14 +185,17 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
     }
   };
 
-  const remove = async (barber: Barber): Promise<void> => {
-    const confirmed = window.confirm(
-      `¿Eliminar a ${barber.name}? También se borrarán sus turnos.`,
-    );
-    if (!confirmed) return;
-
-    await api.barbers.remove(barber.id);
-    onChange(barbers.filter((item) => item.id !== barber.id));
+  const confirmRemove = async (): Promise<void> => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api.barbers.remove(toDelete.id);
+      onChange(barbers.filter((item) => item.id !== toDelete.id));
+      setToast(`Barbero "${toDelete.name}" eliminado`);
+      setToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const toggleActive = async (barber: Barber): Promise<void> => {
@@ -264,7 +272,7 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
               </button>
               <button
                 type="button"
-                onClick={() => remove(barber)}
+                onClick={() => setToDelete(barber)}
                 className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
               >
                 Eliminar
@@ -396,6 +404,17 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar barbero"
+        description={`¿Eliminar a ${toDelete?.name}? También se borrarán sus turnos. Esta acción no se puede deshacer.`}
+        busy={deleting}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </section>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
 import { IconButton } from '@/components/ui/IconButton';
 import { CheckIcon, TrashIcon, XIcon } from '@/components/ui/icons';
@@ -58,6 +59,8 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
   const [blockBusy, setBlockBusy] = useState<boolean>(false);
   const [blockError, setBlockError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<Appointment | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -161,14 +164,17 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
     );
   };
 
-  const remove = async (appointment: Appointment): Promise<void> => {
-    if (!window.confirm(`¿Eliminar el turno de ${appointment.customerName}?`)) {
-      return;
+  const confirmRemove = async (): Promise<void> => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api.appointments.remove(toDelete.id);
+      setAppointments((current) => current.filter((item) => item.id !== toDelete.id));
+      setToast(`Turno de ${toDelete.customerName} eliminado`);
+      setToDelete(null);
+    } finally {
+      setDeleting(false);
     }
-    await api.appointments.remove(appointment.id);
-    setAppointments((current) =>
-      current.filter((item) => item.id !== appointment.id),
-    );
   };
 
   const openBlockForm = (): void => {
@@ -379,7 +385,7 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                         label="Eliminar turno"
                         tone="danger"
                         icon={<TrashIcon />}
-                        onClick={() => remove(appointment)}
+                        onClick={() => setToDelete(appointment)}
                       />
                     </div>
                   </td>
@@ -582,6 +588,15 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar turno"
+        description={`¿Eliminar el turno de ${toDelete?.customerName}? Esta acción no se puede deshacer.`}
+        busy={deleting}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
 
       <Toast message={toast} onDismiss={() => setToast(null)} />
     </section>
