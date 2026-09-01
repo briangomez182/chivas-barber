@@ -144,13 +144,7 @@ export default function TerminosPage() {
         <p className="eyebrow">Legal</p>
         <h1 className="section-title mt-3">Términos y Condiciones</h1>
         <p className="mt-4 text-sm text-ink-soft">
-          Última actualización: agosto de 2026.
-        </p>
-
-        <p className="mt-6 rounded-2xl bg-amber-50 px-5 py-4 text-sm leading-relaxed text-amber-800">
-          Este texto es un modelo general de referencia y no reemplaza el
-          asesoramiento de un profesional. Antes de considerarlo definitivo,
-          te recomendamos que lo revise un abogado.
+          Última actualización: septiembre de 2026.
         </p>
 
         <div className="mt-10 space-y-10">

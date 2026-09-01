@@ -39,7 +39,7 @@ export function LocationSection() {
                 Cómo llegar
               </a>
               <a href={TEL_LINK} className="pill-outline">
-                {BRAND.phoneDisplay}
+                Llamar
               </a>
               <a
                 href={whatsappLink()}
