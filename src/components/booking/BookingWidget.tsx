@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -51,6 +51,17 @@ export function BookingWidget({
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
+
+  const barberSectionRef = useRef<HTMLFieldSetElement>(null);
+  const serviceRef = useRef<HTMLSelectElement>(null);
+  const slotSectionRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const termsRef = useRef<HTMLInputElement>(null);
+
+  // Ancho de referencia por debajo del cual el formulario ocupa más de una
+  // pantalla y conviene guiar al usuario hacia el campo que falta.
+  const MOBILE_SCROLL_BREAKPOINT = 720;
 
   const selectedService = useMemo<Service | undefined>(
     () => services.find((item) => item.id === serviceId),
@@ -106,11 +117,55 @@ export function BookingWidget({
     }
   };
 
+  const getMissingField = (): {
+    ref: React.RefObject<HTMLElement | null>;
+    message: string;
+  } | null => {
+    if (!selectedBarberId) {
+      return { ref: barberSectionRef, message: 'Elegí un barbero' };
+    }
+    if (!serviceId) {
+      return { ref: serviceRef, message: 'Elegí un servicio' };
+    }
+    if (!time) {
+      return { ref: slotSectionRef, message: 'Elegí un horario' };
+    }
+    if (customerName.trim().length < 2) {
+      return { ref: nameInputRef, message: 'Ingresá tu nombre y apellido' };
+    }
+    if (customerPhone.replace(/\D/g, '').length < 8) {
+      return { ref: phoneInputRef, message: 'Ingresá un teléfono válido' };
+    }
+    if (!termsAccepted) {
+      return {
+        ref: termsRef,
+        message: 'Aceptá los Términos y Condiciones para continuar',
+      };
+    }
+    return null;
+  };
+
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ): Promise<void> => {
     event.preventDefault();
-    if (!time || !selectedBarber || !serviceId) return;
+
+    const missingField = getMissingField();
+    if (missingField) {
+      setError(missingField.message);
+
+      if (
+        typeof window !== 'undefined' &&
+        window.innerWidth < MOBILE_SCROLL_BREAKPOINT
+      ) {
+        const el = missingField.ref.current;
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+          el.focus({ preventScroll: true });
+        }
+      }
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -155,15 +210,10 @@ export function BookingWidget({
     }
   };
 
-  const canSubmit =
-    Boolean(time) &&
-    Boolean(selectedBarberId) &&
-    Boolean(serviceId) &&
-    customerName.trim().length >= 2 &&
-    customerPhone.replace(/\D/g, '').length >= 8 &&
-    termsAccepted &&
-    !submitting &&
-    !redirecting;
+  // El botón queda habilitado aunque falten campos: al hacer click,
+  // handleSubmit valida y, en pantallas angostas, hace scroll hasta el
+  // primer campo faltante en lugar de dejar el botón inerte sin feedback.
+  const canSubmit = !submitting && !redirecting;
 
   return (
     <section
@@ -199,7 +249,7 @@ export function BookingWidget({
             {settings.depositEnabled && (
               <p className="mt-5 rounded-2xl bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
                 <strong className="font-bold">Importante:</strong> si no
-                podés asistir a tu turno, la seña no se reintegra. Si
+                asiste a tu turno, la seña no se reintegra. Si
                 necesitás cambiarlo, avisanos con anticipación por{' '}
                 <a
                   href={whatsappLink('Hola, necesito reprogramar mi turno.')}
@@ -220,7 +270,7 @@ export function BookingWidget({
 
           {/* Columna derecha: barbero, servicio, slots y datos */}
           <div className="card p-6 sm:p-8">
-            <fieldset>
+            <fieldset ref={barberSectionRef}>
               <legend className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
                 Barbero
               </legend>
@@ -261,6 +311,7 @@ export function BookingWidget({
               </label>
               <select
                 id="service"
+                ref={serviceRef}
                 required
                 aria-required="true"
                 value={serviceId}
@@ -279,7 +330,7 @@ export function BookingWidget({
               </select>
             </div>
 
-            <div className="mt-7 border-t border-gray-100 pt-7">
+            <div ref={slotSectionRef} className="mt-7 border-t border-gray-100 pt-7">
               <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-bold text-ink">
                   {formatLongDate(date)}
@@ -297,7 +348,11 @@ export function BookingWidget({
               />
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-7 border-t border-gray-100 pt-7">
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              className="mt-7 border-t border-gray-100 pt-7"
+            >
               <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
                 Tus datos
               </h3>
@@ -309,6 +364,7 @@ export function BookingWidget({
                   </label>
                   <input
                     id="name"
+                    ref={nameInputRef}
                     type="text"
                     required
                     autoComplete="name"
@@ -323,6 +379,7 @@ export function BookingWidget({
                   </label>
                   <input
                     id="phone"
+                    ref={phoneInputRef}
                     type="tel"
                     required
                     autoComplete="tel"
@@ -365,6 +422,7 @@ export function BookingWidget({
               <label className="mt-4 flex items-start gap-3 text-sm text-ink-soft">
                 <input
                   type="checkbox"
+                  ref={termsRef}
                   required
                   checked={termsAccepted}
                   onChange={(event) => setTermsAccepted(event.target.checked)}
