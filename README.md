@@ -35,6 +35,17 @@ Preparación, una sola vez:
 2. En **SQL Editor**, pegá y ejecutá el contenido de
    [`supabase/schema.sql`](supabase/schema.sql). Crea las tablas, los índices,
    la función `book_appointment` y activa Row Level Security.
+   Después ejecutá, en orden, los archivos de
+   [`supabase/migrations/`](supabase/migrations) (`0002` … `0014`).
+   [`0012_loyalty_program.sql`](supabase/migrations/0012_loyalty_program.sql)
+   agrega la tarjeta de sellos (`loyalty_cards`) y el trigger que suma un sello
+   cuando un turno queda atendido o pagado.
+   [`0013_loyalty_module_settings.sql`](supabase/migrations/0013_loyalty_module_settings.sql)
+   agrega el switch y la cantidad de sellos configurable (módulo "Tarjeta de
+   Fidelización" en Configuraciones).
+   [`0014_loyalty_fix_ambiguous_column.sql`](supabase/migrations/0014_loyalty_fix_ambiguous_column.sql)
+   corrige el error "column reference \"phone_number\" is ambiguous" al ajustar
+   sellos a mano. Todos son idempotentes.
 3. En **Project Settings › API**, copiá la *Project URL* y la *service_role*
    key a `.env.local` (`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`).
 4. Cargá los datos iniciales:

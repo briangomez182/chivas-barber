@@ -28,3 +28,29 @@ export function whatsappLink(message?: string): string {
 
 /** Link `tel:` normalizado. */
 export const TEL_LINK = `tel:${BRAND.phone}`;
+
+/**
+ * Dígitos del teléfono de un cliente, con código de país. Los turnos
+ * reservados desde la web ya lo guardan así (`WhatsAppPhoneInput`); los
+ * turnos manuales cargados por el barbero en el panel de admin son un
+ * número local argentino sin prefijo, así que si no arranca con `54` se lo
+ * agregamos.
+ */
+export function customerPhoneDigits(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return digits.startsWith('54') ? digits : `54${digits}`;
+}
+
+/** Teléfono de un cliente en formato `+<código de país><número>`, para copiar. */
+export function formatCustomerPhone(phone: string): string {
+  return `+${customerPhoneDigits(phone)}`;
+}
+
+/**
+ * Link `wa.me` para el teléfono de un cliente, con mensaje prellenado
+ * opcional (`?text=`).
+ */
+export function customerWhatsappLink(phone: string, message?: string): string {
+  const base = `https://wa.me/${customerPhoneDigits(phone)}`;
+  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
+}

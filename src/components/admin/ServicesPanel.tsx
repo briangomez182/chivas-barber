@@ -124,8 +124,85 @@ export function ServicesPanel({ services, onChange }: ServicesPanelProps) {
         </button>
       </header>
 
-      <div className="card mt-7 overflow-hidden">
-        <table className="w-full text-left text-sm">
+      {/* Mobile y tablet: tarjetas apiladas — la tabla no entra a lo ancho. */}
+      <ul className="mt-7 space-y-3 lg:hidden">
+        {services.map((service, index) => (
+          <motion.li
+            key={service.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.03 }}
+            className="card p-4"
+          >
+            <div className="flex flex-wrap items-start gap-2">
+              <p className="min-w-0 flex-1 font-bold text-ink">{service.name}</p>
+              {service.featured && (
+                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
+                  Destacado
+                </span>
+              )}
+            </div>
+
+            {service.description && (
+              <p className="mt-1 text-xs text-ink-soft">{service.description}</p>
+            )}
+
+            <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
+                  Duración
+                </dt>
+                <dd className="font-semibold text-brand">
+                  {formatDuration(service.durationMin)}
+                </dd>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <dt className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">
+                  Precio
+                </dt>
+                <dd className="font-semibold text-ink">{formatPrice(service.price)}</dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setDraft({
+                    id: service.id,
+                    name: service.name,
+                    description: service.description,
+                    durationMin: service.durationMin,
+                    price: String(service.price),
+                    featured: service.featured,
+                  });
+                }}
+                className="pill-ghost px-3 py-1.5 text-xs"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setToDelete(service)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
+              >
+                Eliminar
+              </button>
+            </div>
+          </motion.li>
+        ))}
+
+        {services.length === 0 && (
+          <li className="card px-6 py-12 text-center text-sm text-ink-soft">
+            Todavía no hay servicios cargados.
+          </li>
+        )}
+      </ul>
+
+      {/* Desktop: tabla. */}
+      <div className="card mt-7 hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[640px] text-left text-sm">
           <caption className="sr-only">Listado de servicios</caption>
           <thead className="border-b border-gray-100 bg-gray-50/60">
             <tr className="text-xs font-bold uppercase tracking-[0.14em] text-ink-muted">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,6 +12,7 @@ import type { Barber, Service, Settings } from '@/lib/types';
 import { AppointmentsPanel } from './AppointmentsPanel';
 import { BarbersPanel } from './BarbersPanel';
 import { ConfiguracionesPanel } from './ConfiguracionesPanel';
+import { LoyaltyPanel } from './LoyaltyPanel';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
 import { ServicesPanel } from './ServicesPanel';
 import { UsersPanel } from './UsersPanel';
@@ -27,6 +28,7 @@ type TabId =
   | 'turnos'
   | 'barberos'
   | 'servicios'
+  | 'lealtad'
   | 'agenda'
   | 'usuarios'
   | 'configuraciones';
@@ -35,6 +37,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
   { id: 'barberos', label: 'Barberos' },
   { id: 'servicios', label: 'Servicios' },
+  { id: 'lealtad', label: 'Lealtad' },
   { id: 'agenda', label: 'Agenda' },
   { id: 'usuarios', label: 'Usuarios' },
   { id: 'configuraciones', label: 'Configuraciones' },
@@ -52,6 +55,18 @@ export function AdminDashboard({
   const [barbers, setBarbers] = useState<Barber[]>(initialBarbers);
   const [services, setServices] = useState<Service[]>(initialServices);
   const [settings, setSettings] = useState<Settings>(initialSettings);
+
+  const visibleTabs = settings.loyaltyEnabled
+    ? TABS
+    : TABS.filter((item) => item.id !== 'lealtad');
+
+  // Si se apaga el módulo de lealtad estando parado en esa pestaña, vuelve a
+  // Turnos en vez de dejar la pestaña activa oculta del nav.
+  useEffect(() => {
+    if (tab === 'lealtad' && !settings.loyaltyEnabled) {
+      setTab('turnos');
+    }
+  }, [tab, settings.loyaltyEnabled]);
 
   const logout = async (): Promise<void> => {
     await api.auth.logout();
@@ -85,7 +100,7 @@ export function AdminDashboard({
 
         <nav aria-label="Secciones del panel" className="container-page">
           <ul className="flex gap-1 overflow-x-auto pb-3">
-            {TABS.map((item) => {
+            {visibleTabs.map((item) => {
               const active = item.id === tab;
               return (
                 <li key={item.id}>
@@ -130,6 +145,9 @@ export function AdminDashboard({
             )}
             {tab === 'servicios' && (
               <ServicesPanel services={services} onChange={setServices} />
+            )}
+            {tab === 'lealtad' && (
+              <LoyaltyPanel stampsGoal={settings.loyaltyStampsGoal} />
             )}
             {tab === 'agenda' && (
               <ScheduleSettingsPanel settings={settings} onChange={setSettings} />

@@ -1,52 +1,49 @@
-'use client';
-
-import { SLOT_INTERVALS, type SlotInterval } from '@/lib/types';
+import { SLOT_INTERVALS } from '@/lib/types';
 
 interface DurationPillsProps {
   value: number;
-  onChange: (minutes: SlotInterval) => void;
+  /** `true` cuando ya hay un servicio elegido: recién ahí se muestra en color. */
+  highlighted: boolean;
   label?: string;
-  name?: string;
 }
 
-/** Selector de duración de la sesión: 15 / 30 / 45 / 60 minutos. */
+/**
+ * Indicador (no editable) de la duración de la sesión. La duración la fija
+ * el servicio elegido — el usuario no puede tocarla directamente, por eso no
+ * hay inputs ni `onChange`. Se ve sin colores hasta que hay un servicio
+ * seleccionado.
+ */
 export function DurationPills({
   value,
-  onChange,
+  highlighted,
   label = 'Duración de la sesión',
-  name = 'duration',
 }: DurationPillsProps) {
   return (
-    <fieldset>
-      <legend className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+    <div>
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
         {label}
-      </legend>
+      </p>
 
-      <div className="mt-3 inline-flex w-full gap-1 rounded-full bg-gray-100 p-1">
+      <div
+        role="status"
+        aria-label={`${label}: ${value} minutos`}
+        className="mt-3 inline-flex w-full gap-1 rounded-full bg-gray-100 p-1"
+      >
         {SLOT_INTERVALS.map((minutes) => {
-          const active = value === minutes;
+          const active = highlighted && value === minutes;
           return (
-            <label
+            <span
               key={minutes}
-              className={`flex-1 cursor-pointer rounded-full px-3 py-2 text-center text-sm font-semibold transition-all duration-200 ${
-                active
-                  ? 'bg-brand text-white shadow-brand'
-                  : 'text-ink-soft hover:text-ink'
+              aria-hidden="true"
+              className={`flex-1 select-none rounded-full px-3 py-2 text-center text-sm font-semibold transition-colors duration-200 ${
+                active ? 'bg-brand text-white shadow-brand' : 'text-ink-muted'
               }`}
             >
-              <input
-                type="radio"
-                name={name}
-                value={minutes}
-                checked={active}
-                onChange={() => onChange(minutes as SlotInterval)}
-                className="sr-only"
-              />
               {minutes} min
-            </label>
+            </span>
           );
         })}
       </div>
-    </fieldset>
+    </div>
   );
 }

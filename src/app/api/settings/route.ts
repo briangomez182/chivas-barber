@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getSettings, updateSettings, type SettingsPatch } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
-import { SLOT_INTERVALS, type SlotInterval } from '@/lib/types';
+import { LOYALTY_STAMPS_GOALS, SLOT_INTERVALS, type SlotInterval } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +16,8 @@ interface SettingsBody {
   depositEnabled?: boolean;
   showPaginationCount?: boolean;
   showOptionalBookingFields?: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltyStampsGoal?: number;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -88,6 +90,19 @@ export async function PUT(request: Request): Promise<NextResponse> {
   }
   if (body.showOptionalBookingFields !== undefined) {
     patch.showOptionalBookingFields = Boolean(body.showOptionalBookingFields);
+  }
+  if (body.loyaltyEnabled !== undefined) {
+    patch.loyaltyEnabled = Boolean(body.loyaltyEnabled);
+  }
+  if (body.loyaltyStampsGoal !== undefined) {
+    const value = Number(body.loyaltyStampsGoal);
+    if (!(LOYALTY_STAMPS_GOALS as readonly number[]).includes(value)) {
+      return NextResponse.json(
+        { error: 'La cantidad de sellos debe ser 5, 10, 15 o 20' },
+        { status: 400 },
+      );
+    }
+    patch.loyaltyStampsGoal = value as (typeof LOYALTY_STAMPS_GOALS)[number];
   }
 
   if (patch.depositEnabled) {

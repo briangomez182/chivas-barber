@@ -5,16 +5,11 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
+import { WhatsAppPhoneInput, type WhatsAppPhoneValue } from '@/components/ui/WhatsAppPhoneInput';
 import { api } from '@/lib/api-client';
 import { whatsappLink } from '@/lib/brand';
 import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
-import type {
-  Barber,
-  Service,
-  Settings,
-  Slot,
-  SlotInterval,
-} from '@/lib/types';
+import type { Barber, Service, Settings, Slot } from '@/lib/types';
 
 import { Calendar } from './Calendar';
 import { DurationPills } from './DurationPills';
@@ -47,7 +42,9 @@ export function BookingWidget({
   const [error, setError] = useState<string | null>(null);
 
   const [customerName, setCustomerName] = useState<string>('');
+  // Prefijo de país + número local, solo dígitos (lo arma WhatsAppPhoneInput).
   const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [phoneValid, setPhoneValid] = useState<boolean>(false);
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
@@ -56,7 +53,7 @@ export function BookingWidget({
   const serviceRef = useRef<HTMLSelectElement>(null);
   const slotSectionRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLDivElement>(null);
   const termsRef = useRef<HTMLInputElement>(null);
 
   // Ancho de referencia por debajo del cual el formulario ocupa más de una
@@ -109,12 +106,9 @@ export function BookingWidget({
     if (service) setDurationMin(service.durationMin);
   };
 
-  const handleDurationChange = (minutes: SlotInterval): void => {
-    setDurationMin(minutes);
-    // Si el servicio elegido ya no coincide con la duración, se deselecciona.
-    if (selectedService && selectedService.durationMin !== minutes) {
-      setServiceId('');
-    }
+  const handlePhoneChange = (value: WhatsAppPhoneValue): void => {
+    setCustomerPhone(value.whatsappNumber);
+    setPhoneValid(value.isValid);
   };
 
   const getMissingField = (): {
@@ -133,7 +127,7 @@ export function BookingWidget({
     if (customerName.trim().length < 2) {
       return { ref: nameInputRef, message: 'Ingresá tu nombre y apellido' };
     }
-    if (customerPhone.replace(/\D/g, '').length < 8) {
+    if (!phoneValid) {
       return { ref: phoneInputRef, message: 'Ingresá un teléfono válido' };
     }
     if (!termsAccepted) {
@@ -264,7 +258,7 @@ export function BookingWidget({
             )}
 
             <div className="mt-8 border-t border-gray-100 pt-6">
-              <DurationPills value={durationMin} onChange={handleDurationChange} />
+              <DurationPills value={durationMin} highlighted={Boolean(selectedService)} />
             </div>
           </aside>
 
@@ -377,15 +371,12 @@ export function BookingWidget({
                   <label htmlFor="phone" className="sr-only">
                     Teléfono
                   </label>
-                  <input
-                    id="phone"
+                  <WhatsAppPhoneInput
                     ref={phoneInputRef}
-                    type="tel"
+                    id="phone"
                     required
-                    autoComplete="tel"
                     placeholder="Teléfono"
-                    value={customerPhone}
-                    onChange={(event) => setCustomerPhone(event.target.value)}
+                    onChange={handlePhoneChange}
                   />
                 </div>
                 {settings.showOptionalBookingFields && (

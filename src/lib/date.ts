@@ -122,6 +122,14 @@ export function formatLongDate(iso: string): string {
   return `${weekday} ${day} de ${monthName}${suffix}`;
 }
 
+const MONTH_LABELS_SHORT = MONTH_LABELS.map((month) => month.slice(0, 3));
+
+/** `2026-03-12` → `12-Mar`. Para columnas de tabla donde el mes largo no entra. */
+export function formatShortDate(iso: string): string {
+  const { month, day } = parseIsoDate(iso);
+  return `${String(day).padStart(2, '0')}-${MONTH_LABELS_SHORT[month]}`;
+}
+
 export function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;

@@ -2,9 +2,12 @@ type Tone = 'default' | 'success' | 'danger' | 'brand';
 
 interface IconButtonProps {
   label: string;
-  onClick: () => void;
   icon: React.ReactNode;
   tone?: Tone;
+  /** Acción como botón (ej. cambiar estado). Ignorado si se pasa `href`. */
+  onClick?: () => void;
+  /** Acción como link (ej. abrir WhatsApp). Se abre en una pestaña nueva. */
+  href?: string;
 }
 
 const TONE_STYLES: Record<Tone, string> = {
@@ -16,19 +19,32 @@ const TONE_STYLES: Record<Tone, string> = {
 
 /**
  * Botón de acción minimalista, sólo ícono — usado en las filas de las
- * tablas de turnos (Atendido / Cancelar / Reagendar / Eliminar). `label` es
- * el texto que antes se veía: queda como tooltip (`title`) y nombre
- * accesible (`aria-label`), no desaparece, sólo deja de ocupar espacio.
+ * tablas de turnos (Atendido / Cancelar / Reagendar / Eliminar / WhatsApp).
+ * `label` es el texto que antes se veía: queda como tooltip (`title`) y
+ * nombre accesible (`aria-label`), no desaparece, sólo deja de ocupar
+ * espacio. Con `href` se renderiza como link (abre en pestaña nueva) en vez
+ * de botón.
  */
-export function IconButton({ label, onClick, icon, tone = 'default' }: IconButtonProps) {
+export function IconButton({ label, icon, tone = 'default', onClick, href }: IconButtonProps) {
+  const className = `inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${TONE_STYLES[tone]}`;
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        title={label}
+        aria-label={label}
+        className={className}
+      >
+        {icon}
+      </a>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors ${TONE_STYLES[tone]}`}
-    >
+    <button type="button" onClick={onClick} title={label} aria-label={label} className={className}>
       {icon}
     </button>
   );

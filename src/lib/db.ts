@@ -2,11 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { supabaseAdmin } from './supabase/admin';
 import {
+  LOYALTY_STAMPS_GOALS,
   SLOT_INTERVALS,
   type Appointment,
   type AppointmentStatus,
   type Barber,
   type BarberPortfolioImage,
+  type LoyaltyCard,
+  type LoyaltyStampsGoal,
   type PaymentStatus,
   type Profile,
   type ScheduleBlock,
@@ -42,6 +45,8 @@ interface SettingsRow {
   deposit_enabled: boolean;
   show_pagination_count: boolean;
   show_optional_booking_fields: boolean;
+  loyalty_enabled: boolean;
+  loyalty_stamps_goal: number;
 }
 
 interface BarberRow {
@@ -100,8 +105,21 @@ interface ScheduleBlockRow {
   created_at: string;
 }
 
+/** Fila que devuelven las RPC `get_loyalty_card` / `admin_adjust_loyalty_stamp`. */
+interface LoyaltyCardRpcRow {
+  phone_number: string;
+  completed_stamps: number;
+  rewards_earned: number;
+  updated_at: string | null;
+  card_exists: boolean;
+}
+
 function isSlotInterval(value: number): value is SlotInterval {
   return (SLOT_INTERVALS as readonly number[]).includes(value);
+}
+
+function isLoyaltyStampsGoal(value: number): value is LoyaltyStampsGoal {
+  return (LOYALTY_STAMPS_GOALS as readonly number[]).includes(value);
 }
 
 function toSettings(row: SettingsRow): Settings {
@@ -117,6 +135,10 @@ function toSettings(row: SettingsRow): Settings {
     depositEnabled: row.deposit_enabled,
     showPaginationCount: row.show_pagination_count,
     showOptionalBookingFields: row.show_optional_booking_fields,
+    loyaltyEnabled: row.loyalty_enabled,
+    loyaltyStampsGoal: isLoyaltyStampsGoal(row.loyalty_stamps_goal)
+      ? row.loyalty_stamps_goal
+      : 10,
   };
 }
 
@@ -176,6 +198,16 @@ function toScheduleBlock(row: ScheduleBlockRow): ScheduleBlock {
   };
 }
 
+function toLoyaltyCard(row: LoyaltyCardRpcRow): LoyaltyCard {
+  return {
+    phoneNumber: row.phone_number,
+    completedStamps: row.completed_stamps,
+    rewardsEarned: row.rewards_earned,
+    updatedAt: row.updated_at,
+    exists: row.card_exists,
+  };
+}
+
 /** Convierte el error de supabase-js en una excepción con contexto. */
 function fail(operation: string, error: { message: string }): never {
   throw new Error(`Supabase — ${operation}: ${error.message}`);
@@ -194,7 +226,7 @@ function isMalformedId(error: { code?: string } | null): boolean {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_COLUMNS =
-  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count, show_optional_booking_fields';
+  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count, show_optional_booking_fields, loyalty_enabled, loyalty_stamps_goal';
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabaseAdmin()
@@ -223,6 +255,8 @@ export interface SettingsPatch {
   depositEnabled?: boolean;
   showPaginationCount?: boolean;
   showOptionalBookingFields?: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltyStampsGoal?: LoyaltyStampsGoal;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
@@ -241,6 +275,10 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   }
   if (patch.showOptionalBookingFields !== undefined) {
     row.show_optional_booking_fields = patch.showOptionalBookingFields;
+  }
+  if (patch.loyaltyEnabled !== undefined) row.loyalty_enabled = patch.loyaltyEnabled;
+  if (patch.loyaltyStampsGoal !== undefined) {
+    row.loyalty_stamps_goal = patch.loyaltyStampsGoal;
   }
 
   if (Object.keys(row).length === 0) return getSettings();
@@ -1197,4 +1235,59 @@ export async function deleteStaffUser(id: string): Promise<boolean> {
     fail('eliminar usuario', error);
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Programa de lealtad — tarjeta de sellos
+//
+// La suma de sellos la hace un trigger en Postgres cuando un turno se
+// completa/paga (ver supabase/migrations/0012_loyalty_program.sql). Acá sólo
+// viven la consulta pública (por teléfono) y el ajuste manual del admin. Las
+// dos van contra funciones SECURITY DEFINER, así que la normalización del
+// teléfono y las reglas de rollover están en un único lugar: la base.
+// ---------------------------------------------------------------------------
+
+/**
+ * Tarjeta de sellos de un cliente por su teléfono. Devuelve siempre una
+ * tarjeta: si el cliente todavía no sumó nada, `exists: false` y ceros.
+ */
+export async function getLoyaltyCard(
+  phone: string,
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<LoyaltyCard> {
+  const { data, error } = await client
+    .rpc('get_loyalty_card', { p_phone: phone })
+    .single<LoyaltyCardRpcRow>();
+
+  if (error) fail('consultar tarjeta de lealtad', error);
+
+  return toLoyaltyCard(data);
+}
+
+export type LoyaltyAdjustResult =
+  | { card: LoyaltyCard }
+  | { error: 'FORBIDDEN' | 'INVALID_PHONE' };
+
+/**
+ * Ajuste manual de sellos (+1 / -1). Usa `service_role` por default (como el
+ * resto del panel de admin); la ruta ya autorizó con `requireAdmin()`. La
+ * función de Postgres `admin_adjust_loyalty_stamp` revalida el rol si la
+ * llamada trae una sesión de usuario.
+ */
+export async function adjustLoyaltyStamp(
+  phone: string,
+  delta: number,
+  client: SupabaseClient = supabaseAdmin(),
+): Promise<LoyaltyAdjustResult> {
+  const { data, error } = await client
+    .rpc('admin_adjust_loyalty_stamp', { p_phone: phone, p_delta: delta })
+    .single<LoyaltyCardRpcRow>();
+
+  if (error) {
+    if (error.message.includes('FORBIDDEN')) return { error: 'FORBIDDEN' };
+    if (error.message.includes('INVALID_PHONE')) return { error: 'INVALID_PHONE' };
+    fail('ajustar tarjeta de lealtad', error);
+  }
+
+  return { card: toLoyaltyCard(data) };
 }

@@ -7,6 +7,10 @@
 export const SLOT_INTERVALS = [15, 30, 45, 60] as const;
 export type SlotInterval = (typeof SLOT_INTERVALS)[number];
 
+/** Cantidades de sellos admitidas para completar la tarjeta de fidelización. */
+export const LOYALTY_STAMPS_GOALS = [5, 10, 15, 20] as const;
+export type LoyaltyStampsGoal = (typeof LOYALTY_STAMPS_GOALS)[number];
+
 export type AppointmentStatus =
   | 'pending'
   | 'pending_payment'
@@ -90,6 +94,14 @@ export interface Settings {
    * (ambos opcionales). Si es `false`, se ocultan por completo.
    */
   showOptionalBookingFields: boolean;
+  /**
+   * Módulo "Tarjeta de Fidelización": si es `true`, se ven la sección
+   * "Lealtad" del sitio público (búsqueda + tarjeta de sellos) y la pestaña
+   * "Lealtad" del panel de admin. Si es `false`, ambas quedan ocultas.
+   */
+  loyaltyEnabled: boolean;
+  /** Sellos necesarios para completar la tarjeta y ganar un corte gratis. */
+  loyaltyStampsGoal: LoyaltyStampsGoal;
 }
 
 export interface Appointment {
@@ -169,6 +181,21 @@ export interface Session {
   name: string;
   role: UserRole;
   barberId: string | null;
+}
+
+/**
+ * Estado de la tarjeta de sellos de un cliente, identificada por su teléfono
+ * normalizado (dígitos con código de país, ej. `5491160068637`).
+ */
+export interface LoyaltyCard {
+  phoneNumber: string;
+  /** Sellos de la tarjeta en curso — entre 0 y `settings.loyaltyStampsGoal`. */
+  completedStamps: number;
+  /** Cortes gratis acumulados (tarjetas ya completadas). */
+  rewardsEarned: number;
+  updatedAt: string | null;
+  /** `false` si el cliente todavía no tiene ninguna tarjeta registrada. */
+  exists: boolean;
 }
 
 /** Respuesta estándar de error de las API Routes. */

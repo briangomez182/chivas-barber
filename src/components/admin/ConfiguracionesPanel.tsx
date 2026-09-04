@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Field } from '@/components/ui/Field';
 import { api } from '@/lib/api-client';
 import { formatPrice } from '@/lib/date';
-import type { Settings } from '@/lib/types';
+import { LOYALTY_STAMPS_GOALS, type LoyaltyStampsGoal, type Settings } from '@/lib/types';
 
 interface ConfiguracionesPanelProps {
   settings: Settings;
@@ -66,6 +66,10 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
   const [showOptionalBookingFields, setShowOptionalBookingFields] = useState<boolean>(
     settings.showOptionalBookingFields,
   );
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState<boolean>(settings.loyaltyEnabled);
+  const [loyaltyStampsGoal, setLoyaltyStampsGoal] = useState<LoyaltyStampsGoal>(
+    settings.loyaltyStampsGoal,
+  );
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,12 +86,16 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
         depositAmount,
         showPaginationCount,
         showOptionalBookingFields,
+        loyaltyEnabled,
+        loyaltyStampsGoal,
       });
       onChange(saved);
       setDepositEnabled(saved.depositEnabled);
       setDepositAmountText(String(saved.depositAmount));
       setShowPaginationCount(saved.showPaginationCount);
       setShowOptionalBookingFields(saved.showOptionalBookingFields);
+      setLoyaltyEnabled(saved.loyaltyEnabled);
+      setLoyaltyStampsGoal(saved.loyaltyStampsGoal);
       setMessage('Configuración actualizada.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar');
@@ -197,6 +205,58 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
                 onChange={setShowOptionalBookingFields}
               />
             </div>
+          </div>
+
+          <div className="card p-7">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Tarjeta de Fidelización
+            </h3>
+
+            <div className="mt-4">
+              <SwitchRow
+                id="loyalty-enabled"
+                label="Habilitar tarjeta de fidelización"
+                hint={
+                  loyaltyEnabled
+                    ? 'La sección "Lealtad" del sitio y la pestaña "Lealtad" del admin están visibles.'
+                    : 'La sección "Lealtad" del sitio y la pestaña "Lealtad" del admin quedan ocultas.'
+                }
+                checked={loyaltyEnabled}
+                onChange={setLoyaltyEnabled}
+              />
+            </div>
+
+            {loyaltyEnabled && (
+              <fieldset className="mt-6">
+                <legend className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+                  Sellos para completar la tarjeta
+                </legend>
+                <div className="mt-3 inline-flex w-full gap-1 rounded-full bg-gray-100 p-1">
+                  {LOYALTY_STAMPS_GOALS.map((goal) => {
+                    const active = loyaltyStampsGoal === goal;
+                    return (
+                      <label
+                        key={goal}
+                        className={`flex-1 cursor-pointer rounded-full px-3 py-2 text-center text-sm font-semibold transition-all ${
+                          active
+                            ? 'bg-brand text-white shadow-brand'
+                            : 'text-ink-soft hover:text-ink'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="loyaltyStampsGoal"
+                          className="sr-only"
+                          checked={active}
+                          onChange={() => setLoyaltyStampsGoal(goal)}
+                        />
+                        {goal}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
           </div>
         </div>
 

@@ -1,20 +1,34 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
 import { Field } from '@/components/ui/Field';
 import { IconButton } from '@/components/ui/IconButton';
-import { CalendarIcon, CheckIcon, XIcon } from '@/components/ui/icons';
+import { CalendarIcon, CheckIcon, CopyIcon, WhatsAppIcon, XIcon } from '@/components/ui/icons';
 import { Logo } from '@/components/layout/Logo';
 import { Modal } from '@/components/ui/Modal';
+import {
+  SortableColumnHeader,
+  type SortDirection,
+} from '@/components/ui/SortableColumnHeader';
 import { Toast } from '@/components/ui/Toast';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
 import { api } from '@/lib/api-client';
-import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
+import { customerWhatsappLink, formatCustomerPhone } from '@/lib/brand';
+import {
+  formatDuration,
+  formatLongDate,
+  formatPrice,
+  formatShortDate,
+  todayIso,
+} from '@/lib/date';
+import { compareSortValues } from '@/lib/sort';
 import type { Appointment, Barber, ScheduleBlock, Service, Settings } from '@/lib/types';
+
+type SortKey = 'date' | 'time' | 'customer' | 'service' | 'debt' | 'status';
 
 interface EditorTurnosPanelProps {
   editorName: string;
@@ -180,6 +194,53 @@ export function EditorTurnosPanel({
     return debt !== null ? formatPrice(debt) : '—';
   };
 
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
+
+  const toggleSort = (key: SortKey): void => {
+    if (sortKey === key) {
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortValue = (appointment: Appointment, key: SortKey): string | number => {
+    switch (key) {
+      case 'date':
+        return `${appointment.date} ${appointment.time}`;
+      case 'time':
+        return appointment.time;
+      case 'customer':
+        return appointment.customerName;
+      case 'service':
+        return serviceName(appointment.serviceId);
+      case 'debt':
+        return debtOf(appointment) ?? -1;
+      case 'status':
+        return STATUS_LABELS[appointment.status];
+    }
+  };
+
+  const sortedAppointments = useMemo(() => {
+    if (!sortKey) return appointments;
+    return [...appointments].sort((a, b) =>
+      compareSortValues(sortValue(a, sortKey), sortValue(b, sortKey), sortDir),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointments, sortKey, sortDir, services]);
+
+  const copyPhone = async (appointment: Appointment): Promise<void> => {
+    const phone = formatCustomerPhone(appointment.customerPhone);
+    try {
+      await navigator.clipboard.writeText(phone);
+      setToast(`Teléfono de ${appointment.customerName} copiado: ${phone}`);
+    } catch {
+      setToast('No se pudo copiar el teléfono');
+    }
+  };
+
   const setStatus = async (
     appointment: Appointment,
     status: Appointment['status'],
@@ -311,7 +372,7 @@ export function EditorTurnosPanel({
               </p>
             </div>
 
-            <div className="flex items-end gap-3">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
               <label htmlFor="filter-date" className="sr-only">
                 Fecha
               </label>
@@ -320,124 +381,243 @@ export function EditorTurnosPanel({
                 type="date"
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
-                className="w-auto rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm sm:w-auto"
               />
               <button
                 type="button"
                 onClick={() => setNewDraft({ ...EMPTY_NEW, date: date || todayIso() })}
-                className="pill-primary"
+                className="pill-primary w-full sm:w-auto"
               >
                 + Turno manual
               </button>
             </div>
           </header>
 
-          <div className="card mt-7 overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <caption className="sr-only">Mis turnos del día seleccionado</caption>
-              <thead className="border-b border-gray-100 bg-gray-50/60">
-                <tr className="text-xs font-bold uppercase tracking-[0.14em] text-ink-muted">
-                  <th scope="col" className="px-6 py-4">Hora</th>
-                  <th scope="col" className="px-6 py-4">Cliente</th>
-                  <th scope="col" className="px-6 py-4">Servicio</th>
-                  <th scope="col" className="px-6 py-4">Deuda</th>
-                  <th scope="col" className="px-6 py-4">Estado</th>
-                  <th scope="col" className="px-6 py-4 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-ink-muted">
-                      Cargando turnos…
-                    </td>
-                  </tr>
-                )}
+          {loading && (
+            <div className="card mt-7 px-6 py-12 text-center text-sm text-ink-muted">
+              Cargando turnos…
+            </div>
+          )}
 
-                {!loading && appointments.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-ink-soft">
-                      No tenés turnos para esta fecha.
-                    </td>
-                  </tr>
-                )}
+          {!loading && appointments.length === 0 && (
+            <div className="card mt-7 px-6 py-12 text-center text-sm text-ink-soft">
+              No tenés turnos para esta fecha.
+            </div>
+          )}
 
-                {!loading &&
-                  appointments.map((appointment, index) => (
-                    <motion.tr
-                      key={appointment.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.03 }}
-                    >
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <p className="font-bold text-ink">{appointment.time}</p>
-                        <p className="text-xs text-ink-muted">
-                          {formatDuration(appointment.durationMin)}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-ink">{appointment.customerName}</p>
-                        <a
-                          href={`tel:${appointment.customerPhone}`}
-                          className="text-xs text-brand hover:underline"
-                        >
-                          {appointment.customerPhone}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4 text-ink-soft">
-                        {serviceName(appointment.serviceId)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
-                        {debtLabel(appointment)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[appointment.status]}`}
-                        >
-                          {STATUS_LABELS[appointment.status]}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          {appointment.status !== 'done' && (
+          {!loading && appointments.length > 0 && (
+            <>
+              {/* Tabla: desde lg hacia arriba, donde entran todas las columnas sin scroll. */}
+              <div className="card mt-7 hidden overflow-x-auto lg:block">
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">Mis turnos del día seleccionado</caption>
+                  <thead className="border-b border-gray-100 bg-gray-50/60">
+                    <tr className="text-xs font-bold uppercase tracking-[0.14em] text-ink-muted">
+                      <SortableColumnHeader
+                        label="Día"
+                        sortKey="date"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <SortableColumnHeader
+                        label="Hora"
+                        sortKey="time"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <SortableColumnHeader
+                        label="Cliente"
+                        sortKey="customer"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <SortableColumnHeader
+                        label="Servicio"
+                        sortKey="service"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <SortableColumnHeader
+                        label="Deuda"
+                        sortKey="debt"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <SortableColumnHeader
+                        label="Estado"
+                        sortKey="status"
+                        activeKey={sortKey}
+                        direction={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <th scope="col" className="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedAppointments.map((appointment, index) => (
+                      <motion.tr
+                        key={appointment.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.03 }}
+                      >
+                        <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                          {formatShortDate(appointment.date)}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <p className="font-bold text-ink">{appointment.time}</p>
+                          <p className="text-xs text-ink-muted">
+                            {formatDuration(appointment.durationMin)}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-ink">{appointment.customerName}</p>
+                        </td>
+                        <td className="px-6 py-4 text-ink-soft">
+                          {serviceName(appointment.serviceId)}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                          {debtLabel(appointment)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[appointment.status]}`}
+                          >
+                            {STATUS_LABELS[appointment.status]}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-1">
                             <IconButton
-                              label="Marcar como atendido"
+                              label={`Copiar teléfono de ${appointment.customerName}`}
+                              icon={<CopyIcon />}
+                              onClick={() => copyPhone(appointment)}
+                            />
+                            <IconButton
+                              label={`WhatsApp a ${appointment.customerName}`}
                               tone="success"
-                              icon={<CheckIcon />}
-                              onClick={() => setStatus(appointment, 'done')}
+                              icon={<WhatsAppIcon />}
+                              href={customerWhatsappLink(appointment.customerPhone)}
                             />
-                          )}
-                          {appointment.status !== 'cancelled' && (
+                            {appointment.status !== 'done' && (
+                              <IconButton
+                                label="Marcar como atendido"
+                                tone="success"
+                                icon={<CheckIcon />}
+                                onClick={() => setStatus(appointment, 'done')}
+                              />
+                            )}
+                            {appointment.status !== 'cancelled' && (
+                              <IconButton
+                                label="Cancelar turno"
+                                icon={<XIcon />}
+                                onClick={() => setStatus(appointment, 'cancelled')}
+                              />
+                            )}
                             <IconButton
-                              label="Cancelar turno"
-                              icon={<XIcon />}
-                              onClick={() => setStatus(appointment, 'cancelled')}
+                              label="Reagendar turno"
+                              tone="brand"
+                              icon={<CalendarIcon />}
+                              onClick={() =>
+                                setReschedule({
+                                  appointment,
+                                  date: appointment.date,
+                                  time: appointment.time,
+                                })
+                              }
                             />
-                          )}
-                          <IconButton
-                            label="Reagendar turno"
-                            tone="brand"
-                            icon={<CalendarIcon />}
-                            onClick={() =>
-                              setReschedule({
-                                appointment,
-                                date: appointment.date,
-                                time: appointment.time,
-                              })
-                            }
-                          />
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Tarjetas: mobile y tablet, para no tener que scrollear horizontal. */}
+              <div className="mt-7 space-y-3 lg:hidden">
+                {sortedAppointments.map((appointment, index) => (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.03 }}
+                    className="card p-4 sm:p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-bold text-ink">
+                        {formatShortDate(appointment.date)} · {appointment.time}
+                      </p>
+                      <span
+                        className={`inline-block shrink-0 rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[appointment.status]}`}
+                      >
+                        {STATUS_LABELS[appointment.status]}
+                      </span>
+                    </div>
+
+                    <p className="mt-3 font-semibold text-ink">{appointment.customerName}</p>
+
+                    <div className="mt-3 border-t border-gray-100 pt-3 text-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-ink-muted">
+                        Deuda
+                      </p>
+                      <p className="mt-1 font-semibold text-ink">{debtLabel(appointment)}</p>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end gap-1 border-t border-gray-100 pt-3">
+                      <IconButton
+                        label={`Copiar teléfono de ${appointment.customerName}`}
+                        icon={<CopyIcon />}
+                        onClick={() => copyPhone(appointment)}
+                      />
+                      <IconButton
+                        label={`WhatsApp a ${appointment.customerName}`}
+                        tone="success"
+                        icon={<WhatsAppIcon />}
+                        href={customerWhatsappLink(appointment.customerPhone)}
+                      />
+                      {appointment.status !== 'done' && (
+                        <IconButton
+                          label="Marcar como atendido"
+                          tone="success"
+                          icon={<CheckIcon />}
+                          onClick={() => setStatus(appointment, 'done')}
+                        />
+                      )}
+                      {appointment.status !== 'cancelled' && (
+                        <IconButton
+                          label="Cancelar turno"
+                          icon={<XIcon />}
+                          onClick={() => setStatus(appointment, 'cancelled')}
+                        />
+                      )}
+                      <IconButton
+                        label="Reagendar turno"
+                        tone="brand"
+                        icon={<CalendarIcon />}
+                        onClick={() =>
+                          setReschedule({
+                            appointment,
+                            date: appointment.date,
+                            time: appointment.time,
+                          })
+                        }
+                      />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
 
           {total > 0 && (
             <div
-              className={`mt-4 flex items-center gap-2 text-sm text-ink-soft ${
+              className={`mt-4 flex flex-wrap items-center gap-2 text-sm text-ink-soft ${
                 settings.showPaginationCount ? 'justify-center' : 'justify-end'
               }`}
             >

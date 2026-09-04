@@ -3,6 +3,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { BookingExperience } from '@/components/sections/BookingExperience';
 import { LocationSection } from '@/components/sections/LocationSection';
+import { LoyaltySection } from '@/components/sections/LoyaltySection';
 import { ServicesSection } from '@/components/sections/ServicesSection';
 import { getSettings, listBarberPortfolioImages, listBarbers, listServices } from '@/lib/db';
 
@@ -38,6 +39,9 @@ export default async function HomePage() {
           services={services}
           settings={settings}
         />
+        {settings.loyaltyEnabled && (
+          <LoyaltySection stampsGoal={settings.loyaltyStampsGoal} />
+        )}
         <LocationSection />
       </main>
 

@@ -2,6 +2,7 @@ import type {
   Appointment,
   Barber,
   BarberPortfolioImage,
+  LoyaltyCard,
   Profile,
   ScheduleBlock,
   Service,
@@ -233,6 +234,19 @@ export const api = {
       }),
     remove: (id: string) =>
       apiFetch<{ ok: true }>(`/api/users/${id}`, { method: 'DELETE' }),
+  },
+  loyalty: {
+    /** Consulta pública de la tarjeta de sellos por teléfono (dígitos con prefijo). */
+    lookup: (phone: string) =>
+      apiFetch<{ card: LoyaltyCard }>(
+        `/api/loyalty?phone=${encodeURIComponent(phone)}`,
+      ),
+    /** Ajuste manual de sellos — sólo admin. */
+    adjust: (phone: string, delta: 1 | -1) =>
+      apiFetch<{ card: LoyaltyCard }>('/api/loyalty', {
+        method: 'POST',
+        body: JSON.stringify({ phone, delta }),
+      }),
   },
   auth: {
     login: (email: string, password: string) =>
