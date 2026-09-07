@@ -56,9 +56,10 @@ export function BookingWidget({
   const phoneInputRef = useRef<HTMLDivElement>(null);
   const termsRef = useRef<HTMLInputElement>(null);
 
-  // Ancho de referencia por debajo del cual el formulario ocupa más de una
-  // pantalla y conviene guiar al usuario hacia el campo que falta.
-  const MOBILE_SCROLL_BREAKPOINT = 720;
+  // Ancho de referencia por debajo del cual el calendario y el formulario no
+  // entran juntos en pantalla y conviene guiar al usuario con scroll: hacia el
+  // campo que falta al confirmar, o hacia la sección de barbero al elegir fecha.
+  const MOBILE_SCROLL_BREAKPOINT = 750;
 
   const selectedService = useMemo<Service | undefined>(
     () => services.find((item) => item.id === serviceId),
@@ -100,10 +101,72 @@ export function BookingWidget({
     setTime(null);
   }, [date, selectedBarberId, durationMin]);
 
+  const handleDateChange = (nextDate: string): void => {
+    setDate(nextDate);
+
+    // En pantallas angostas el calendario ocupa casi toda la vista y la
+    // sección de barbero queda fuera de pantalla. Al elegir fecha llevamos al
+    // usuario al siguiente paso para que la selección tenga un efecto visible.
+    if (
+      typeof window !== 'undefined' &&
+      window.innerWidth < MOBILE_SCROLL_BREAKPOINT
+    ) {
+      barberSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  };
+
+  const handleSelectBarber = (barberId: string): void => {
+    onSelectBarber(barberId);
+
+    // Mismo criterio que al elegir fecha: en pantallas angostas llevamos al
+    // usuario al siguiente paso, la selección de servicio.
+    if (
+      typeof window !== 'undefined' &&
+      window.innerWidth < MOBILE_SCROLL_BREAKPOINT
+    ) {
+      serviceRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  };
+
   const handleServiceChange = (nextId: string): void => {
     setServiceId(nextId);
     const service = services.find((item) => item.id === nextId);
     if (service) setDurationMin(service.durationMin);
+
+    // Mismo criterio que al elegir fecha o barbero: en pantallas angostas
+    // llevamos al usuario al siguiente paso, la selección de horario.
+    if (
+      service &&
+      typeof window !== 'undefined' &&
+      window.innerWidth < MOBILE_SCROLL_BREAKPOINT
+    ) {
+      slotSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  };
+
+  const handleSelectTime = (nextTime: string): void => {
+    setTime(nextTime);
+
+    // Mismo criterio que los pasos anteriores: en pantallas angostas, tras
+    // elegir horario llevamos al usuario al formulario para cargar sus datos.
+    if (
+      typeof window !== 'undefined' &&
+      window.innerWidth < MOBILE_SCROLL_BREAKPOINT
+    ) {
+      phoneInputRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
   };
 
   const handlePhoneChange = (value: WhatsAppPhoneValue): void => {
@@ -236,7 +299,7 @@ export function BookingWidget({
           >
             <Calendar
               value={date}
-              onChange={setDate}
+              onChange={handleDateChange}
               workingDays={settings.workingDays}
             />
 
@@ -257,7 +320,7 @@ export function BookingWidget({
               </p>
             )}
 
-            <div className="mt-8 border-t border-gray-100 pt-6">
+            <div className="mt-8 border-t border-gray-100 pt-6 max-[749px]:hidden">
               <DurationPills value={durationMin} highlighted={Boolean(selectedService)} />
             </div>
           </aside>
@@ -275,7 +338,7 @@ export function BookingWidget({
                     <button
                       key={barber.id}
                       type="button"
-                      onClick={() => onSelectBarber(barber.id)}
+                      onClick={() => handleSelectBarber(barber.id)}
                       aria-pressed={active}
                       className={`flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-4 text-sm font-semibold transition-all duration-200 ${
                         active
@@ -337,7 +400,7 @@ export function BookingWidget({
               <SlotGrid
                 slots={slots}
                 value={time}
-                onChange={setTime}
+                onChange={handleSelectTime}
                 loading={loadingSlots}
               />
             </div>

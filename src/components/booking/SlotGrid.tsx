@@ -42,10 +42,15 @@ export function SlotGrid({ slots, value, onChange, loading }: SlotGridProps) {
         {available} {available === 1 ? 'horario disponible' : 'horarios disponibles'}
       </p>
 
+      {/*
+        Por debajo de 750px el contenedor con scroll interno deja los últimos
+        horarios ocultos; ahí los mostramos todos y dejamos scrollear la página.
+        Desde 750px se mantiene el panel acotado con scroll propio.
+      */}
       <div
         role="listbox"
         aria-label="Horarios disponibles"
-        className="scroll-slim grid max-h-[280px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4"
+        className="scroll-slim grid grid-cols-3 gap-2 pr-1 sm:grid-cols-4 min-[750px]:max-h-[280px] min-[750px]:overflow-y-auto"
       >
         {slots.map((slot, index) => {
           const selected = slot.time === value;
