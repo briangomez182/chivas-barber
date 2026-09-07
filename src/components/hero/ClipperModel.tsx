@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
@@ -15,6 +15,29 @@ const TEETH_COUNT = 13;
 const BODY_COLOR = '#1F2430';
 const CHROME_COLOR = '#E8ECF2';
 const BRAND_COLOR = '#0066FF';
+
+/** Escala base del modelo y factor extra cuando el viewport es angosto. */
+const BASE_SCALE = 0.82;
+const COMPACT_QUERY = '(max-width: 749px)';
+const COMPACT_SCALE_BOOST = 1.2;
+
+/** `true` cuando la home está por debajo de 750px de ancho. */
+function useCompactViewport(): boolean {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mql = window.matchMedia(COMPACT_QUERY);
+    const sync = () => setCompact(mql.matches);
+
+    sync();
+    mql.addEventListener('change', sync);
+    return () => mql.removeEventListener('change', sync);
+  }, []);
+
+  return compact;
+}
 
 function Teeth() {
   /** Posiciones X de los dientes de la cuchilla, centradas en 0. */
@@ -42,40 +65,27 @@ function Teeth() {
   );
 }
 
-function Cable() {
-  const geometry = useMemo<THREE.TubeGeometry>(() => {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -1.42, 0),
-      new THREE.Vector3(0.12, -1.95, -0.28),
-      new THREE.Vector3(-0.34, -2.35, -0.7),
-      new THREE.Vector3(-0.15, -2.85, -1.25),
-      new THREE.Vector3(0.45, -3.05, -1.85),
-    ]);
-    return new THREE.TubeGeometry(curve, 64, 0.055, 12, false);
-  }, []);
-
-  return (
-    <mesh geometry={geometry} castShadow>
-      <meshStandardMaterial color="#111827" metalness={0.35} roughness={0.55} />
-    </mesh>
-  );
-}
-
 export function ClipperModel() {
   const groupRef = useRef<THREE.Group>(null);
+  const compact = useCompactViewport();
+  const scale = compact ? BASE_SCALE * COMPACT_SCALE_BOOST : BASE_SCALE;
 
-  /** Rotación en loop suave + micro-oscilación en el eje X. */
-  useFrame((state) => {
+  /**
+   * Giro continuo y constante en el eje Y (nunca se detiene ni invierte, por
+   * eso usamos `delta` en lugar de un `Math.sin` que frena en los extremos) +
+   * micro-oscilación suave en X para darle vida sin cortar el movimiento.
+   */
+  useFrame((state, delta) => {
     const group = groupRef.current;
     if (!group) return;
 
     const time = state.clock.getElapsedTime();
-    group.rotation.y = Math.sin(time * 0.35) * 0.35;
+    group.rotation.y += delta * 0.45;
     group.rotation.x = Math.sin(time * 0.5) * 0.06;
   });
 
   return (
-    <group ref={groupRef} rotation={[0.1, -0.35, 0.22]} scale={0.82} position={[0, 0.55, 0]}>
+    <group ref={groupRef} rotation={[0.1, -0.35, 0.22]} scale={scale} position={[0, 0.55, 0]}>
       {/* Cuerpo principal */}
       <RoundedBox args={[1.12, 2.7, 0.72]} radius={0.2} smoothness={6} castShadow>
         <meshStandardMaterial
@@ -168,8 +178,6 @@ export function ClipperModel() {
           <meshStandardMaterial color="#0B1220" metalness={0.6} roughness={0.7} />
         </mesh>
       ))}
-
-      <Cable />
     </group>
   );
 }
