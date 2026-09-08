@@ -79,6 +79,16 @@ let audioCtx: AudioContext | null = null;
 // llamadas casi simultáneas (StrictMode en dev, doble disparo del poll, etc.)
 // apilen la alerta y suene el doble de largo.
 let beepScheduledUntil = 0;
+// El barbero ya confirmó el sonido en esta pestaña (con el botón del modal).
+// Vive fuera del componente para no volver a pedirlo al navegar entre
+// /admin/mis-turnos y /admin/turnero; se reinicia al recargar la página.
+let soundArmed = false;
+
+/** ¿El audio está bloqueado por la política de autoplay del navegador? */
+function isAudioBlocked(): boolean {
+  const ctx = getAudioCtx();
+  return !ctx || ctx.state !== 'running';
+}
 
 function getAudioCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -201,9 +211,10 @@ export function TurneroView({
     }
   }, [muted]);
 
-  // Al montar (primera visita o recarga de la página): si el navegador tiene
-  // el audio suspendido por la política de autoplay y el sonido no está
-  // silenciado, se le recuerda al barbero que lo active con un clic.
+  // Al entrar a la vista (montaje): si el sonido no está silenciado y todavía
+  // no se confirmó en esta pestaña, se muestra el modal para activarlo con un
+  // clic. Aparece tanto al recargar como al navegar desde "Mis turnos" — el
+  // navegador exige un gesto del usuario para poder reproducir audio.
   useEffect(() => {
     let mutedPref = false;
     try {
@@ -211,17 +222,25 @@ export function TurneroView({
     } catch {
       /* ignore */
     }
-    if (mutedPref) return;
-
-    const ctx = getAudioCtx();
-    if (ctx && ctx.state === 'suspended') setNeedsSoundUnlock(true);
+    if (!mutedPref && !soundArmed) setNeedsSoundUnlock(true);
   }, []);
 
   const enableSound = useCallback((): void => {
     unlockAudio();
     playBeep();
+    soundArmed = true;
     setNeedsSoundUnlock(false);
     setToast('Sonido activado. Vas a escuchar un aviso con cada turno nuevo.');
+  }, []);
+
+  // Suena la alerta; si el navegador la bloqueó, vuelve a pedir activarla.
+  const beepOrPrompt = useCallback((): void => {
+    if (mutedRef.current) return;
+    playBeep();
+    if (isAudioBlocked()) {
+      soundArmed = false;
+      setNeedsSoundUnlock(true);
+    }
   }, []);
 
   // Reloj en vivo.
@@ -324,11 +343,11 @@ export function TurneroView({
 
           if (justPaid.length > 0) {
             setArrival(justPaid[justPaid.length - 1]);
-            if (!mutedRef.current) playBeep();
+            beepOrPrompt();
           } else if (otherNew.length > 0) {
             const appointment = otherNew[otherNew.length - 1];
             setToast(`Nuevo turno: ${appointment.customerName} · ${appointment.time}`);
-            if (!mutedRef.current) playBeep();
+            beepOrPrompt();
           }
         }
 
@@ -352,7 +371,7 @@ export function TurneroView({
       active = false;
       clearTimeout(timer);
     };
-  }, [barberId, role]);
+  }, [barberId, role, beepOrPrompt]);
 
   const clock = now.toLocaleTimeString('es-AR', {
     timeZone: TIMEZONE,
@@ -390,7 +409,7 @@ export function TurneroView({
       {!isFullscreen && (
         <header className="border-b border-gray-100 bg-white">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 max-[749px]:hidden">
             <Logo />
             <div>
               <h1 className="text-lg font-extrabold tracking-[-0.02em] text-ink">
@@ -404,74 +423,80 @@ export function TurneroView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="hidden text-sm text-ink-soft lg:inline">
-              Hola, <strong className="font-semibold text-ink">{userName}</strong>
-            </span>
+            {/* En pantallas angostas (< 750px) se oculta todo este bloque de
+                controles y sólo queda visible el botón "Volver": el Turnero
+                se abre desde el celular sobre todo para salir rápido, no
+                para tocar sonido, animación o pantalla completa. */}
+            <div className="flex flex-wrap items-center gap-2 max-[749px]:hidden">
+              <span className="hidden text-sm text-ink-soft lg:inline">
+                Hola, <strong className="font-semibold text-ink">{userName}</strong>
+              </span>
 
-            {role === 'admin' && barbers.length > 0 && (
-              <>
-                <label htmlFor="turnero-barber" className="sr-only">
-                  Barbero
-                </label>
-                <select
-                  id="turnero-barber"
-                  value={barberId ?? ''}
-                  onChange={(event) => setBarberId(event.target.value || null)}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
-                >
-                  {barbers.map((barber) => (
-                    <option key={barber.id} value={barber.id}>
-                      {barber.name}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-            <span className="tabular-nums text-sm font-semibold text-ink-soft">
-              {clock}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setMuted((current) => !current)}
-              aria-pressed={!muted}
-              className="pill-ghost text-sm"
-            >
-              {muted ? 'Sonido off' : 'Sonido on'}
-            </button>
-
-            <button
-              type="button"
-              onClick={previewAdvance}
-              disabled={previewShift || baseBlocks.length === 0}
-              className="pill-ghost text-sm disabled:opacity-40"
-            >
-              Ver animación
-            </button>
-
-            {/* TEMPORAL: crear un turno de prueba con seña "paga". */}
-            <button
-              type="button"
-              onClick={() => void createTestTurn()}
-              disabled={creatingTest || (role === 'admin' && !barberId)}
-              className="rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40"
-            >
-              {creatingTest ? 'Creando…' : '🧪 Turno de prueba'}
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="pill-outline inline-flex items-center gap-1.5 text-sm"
-            >
-              {isFullscreen ? (
-                <CompressIcon className="h-4 w-4" />
-              ) : (
-                <ExpandIcon className="h-4 w-4" />
+              {role === 'admin' && barbers.length > 0 && (
+                <>
+                  <label htmlFor="turnero-barber" className="sr-only">
+                    Barbero
+                  </label>
+                  <select
+                    id="turnero-barber"
+                    value={barberId ?? ''}
+                    onChange={(event) => setBarberId(event.target.value || null)}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                  >
+                    {barbers.map((barber) => (
+                      <option key={barber.id} value={barber.id}>
+                        {barber.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
               )}
-              {isFullscreen ? 'Salir' : 'Pantalla completa'}
-            </button>
+
+              <span className="tabular-nums text-sm font-semibold text-ink-soft">
+                {clock}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setMuted((current) => !current)}
+                aria-pressed={!muted}
+                className="pill-ghost text-sm"
+              >
+                {muted ? 'Sonido off' : 'Sonido on'}
+              </button>
+
+              <button
+                type="button"
+                onClick={previewAdvance}
+                disabled={previewShift || baseBlocks.length === 0}
+                className="pill-ghost text-sm disabled:opacity-40"
+              >
+                Ver animación
+              </button>
+
+              {/* TEMPORAL: crear un turno de prueba con seña "paga". */}
+              <button
+                type="button"
+                onClick={() => void createTestTurn()}
+                disabled={creatingTest || (role === 'admin' && !barberId)}
+                className="rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40"
+              >
+                {creatingTest ? 'Creando…' : '🧪 Turno de prueba'}
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="pill-outline inline-flex items-center gap-1.5 text-sm"
+              >
+                {isFullscreen ? (
+                  <CompressIcon className="h-4 w-4" />
+                ) : (
+                  <ExpandIcon className="h-4 w-4" />
+                )}
+                {isFullscreen ? 'Salir' : 'Pantalla completa'}
+              </button>
+            </div>
 
             <Link
               href={role === 'editor' ? '/admin/mis-turnos' : '/admin'}
