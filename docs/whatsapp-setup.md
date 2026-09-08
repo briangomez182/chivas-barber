@@ -13,7 +13,7 @@ Webhook de Mercado Pago (pago approved)
        éxito  → fila queda "sent"
        falla  → fila queda "pending" con next_retry_at
 
-Cron /api/notifications/dispatch (cada 5 min, ver vercel.json)
+Cron /api/notifications/dispatch (1 vez por día en Hobby, ver vercel.json)
   → reintenta las "pending" con backoff (1m, 2m, 4m, 8m… hasta 5 intentos)
   → tras 5 intentos fallidos la fila queda "failed"
 ```
@@ -105,13 +105,16 @@ CRON_SECRET=<string aleatorio largo>
 
 ### 6. Cron en Vercel
 
-`vercel.json` ya define el cron cada 5 minutos. Ojo:
+`vercel.json` define el cron **una vez por día** (`0 8 * * *`), que es el
+máximo que permite el plan Hobby — una expresión más frecuente hace fallar el
+deploy. Ojo:
 
-- **Plan Hobby**: Vercel sólo corre los crons **una vez por día**. El envío
-  inline desde el webhook cubre el caso normal igual; el cron sólo reintenta
-  los que fallaron. Si querés reintentos frecuentes, o pasás a plan Pro, o
-  usás un pinger externo (cron-job.org, GitHub Actions) que pegue cada N
-  minutos a `GET /api/notifications/dispatch` con el header
+- El envío **inline** desde el webhook cubre el caso normal (llega en el
+  momento); el cron diario sólo levanta los avisos que hayan quedado
+  `pending` por un fallo puntual.
+- Si querés reintentos más frecuentes: pasás a plan Pro y ponés
+  `*/5 * * * *`, o usás un pinger externo (cron-job.org, GitHub Actions) que
+  pegue cada N minutos a `GET /api/notifications/dispatch` con el header
   `Authorization: Bearer <CRON_SECRET>`.
 - El `CRON_SECRET` tiene que estar en las env vars del proyecto para que
   Vercel lo incluya en el request del cron. Sin él, el endpoint responde 401.
