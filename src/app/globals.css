@@ -47,6 +47,16 @@
     @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
   }
 
+  /*
+   * Variante ancha para el panel interno (admin / editor): sus tablas tienen
+   * muchas columnas y con `max-w-6xl` obligaban a scrollear horizontal en
+   * laptops. Sigue siendo `w-full`, así que en pantallas chicas se comporta
+   * igual que `container-page`.
+   */
+  .container-wide {
+    @apply mx-auto w-full max-w-[92rem] px-5 sm:px-8;
+  }
+
   .pill {
     @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm
       font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40;

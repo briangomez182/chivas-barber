@@ -70,15 +70,32 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
   const [loyaltyStampsGoal, setLoyaltyStampsGoal] = useState<LoyaltyStampsGoal>(
     settings.loyaltyStampsGoal,
   );
+  // El switch del módulo: `ownerWhatsapp === null` en la DB significa "aviso
+  // desactivado", así que ese es el estado inicial del toggle.
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(
+    settings.ownerWhatsapp !== null,
+  );
+  // Sólo dígitos y un `+` al frente — se normaliza a `+<dígitos>` al guardar.
+  const [ownerWhatsappText, setOwnerWhatsappText] = useState<string>(
+    settings.ownerWhatsapp ?? '',
+  );
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const save = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    setMessage(null);
+
+    if (notificationsEnabled && !ownerWhatsappText.trim()) {
+      setError(
+        'Ingresá el WhatsApp del dueño para poder habilitar las notificaciones.',
+      );
+      return;
+    }
+
     setBusy(true);
     setError(null);
-    setMessage(null);
 
     try {
       const { settings: saved } = await api.settings.update({
@@ -88,6 +105,7 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
         showOptionalBookingFields,
         loyaltyEnabled,
         loyaltyStampsGoal,
+        ownerWhatsapp: notificationsEnabled ? ownerWhatsappText.trim() : null,
       });
       onChange(saved);
       setDepositEnabled(saved.depositEnabled);
@@ -96,6 +114,8 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
       setShowOptionalBookingFields(saved.showOptionalBookingFields);
       setLoyaltyEnabled(saved.loyaltyEnabled);
       setLoyaltyStampsGoal(saved.loyaltyStampsGoal);
+      setOwnerWhatsappText(saved.ownerWhatsapp ?? '');
+      setNotificationsEnabled(saved.ownerWhatsapp !== null);
       setMessage('Configuración actualizada.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar');
@@ -118,13 +138,14 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
         </p>
       </header>
 
-      <form onSubmit={save} className="mt-7 max-w-3xl">
+      <form onSubmit={save} className="mt-7 max-w-12xl">
         {/*
-          Grilla de 2 columnas al 50% (una sola en mobile). Cada módulo nuevo
-          se agrega como una `<div className="card">` más al final de este
-          grid — el layout se acomoda solo, no hace falta tocar nada más.
+          Grilla responsiva: 1 columna en mobile, 2 en tablet, 3 en desktop.
+          Cada módulo nuevo se agrega como una `<div className="card">` más al
+          final de este grid — todas las tarjetas mantienen el mismo ancho,
+          no hace falta tocar nada más.
         */}
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <div className="card p-7">
             <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
               Pagos
@@ -256,6 +277,47 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
                   })}
                 </div>
               </fieldset>
+            )}
+          </div>
+
+          <div className="card p-7">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">
+              Notificaciones
+            </h3>
+
+            <div className="mt-4">
+              <SwitchRow
+                id="notifications-enabled"
+                label="Habilitar notificaciones"
+                hint={
+                  notificationsEnabled
+                    ? 'El dueño recibe un aviso por WhatsApp cada vez que un cliente paga la seña de un turno.'
+                    : 'No se envían avisos por WhatsApp al dueño.'
+                }
+                checked={notificationsEnabled}
+                onChange={setNotificationsEnabled}
+              />
+            </div>
+
+            {notificationsEnabled && (
+              <Field
+                className="mt-6"
+                label="WhatsApp del dueño"
+                htmlFor="owner-whatsapp"
+                hint="Número que recibe el aviso. Formato internacional, ej. +5491160068637."
+              >
+                <input
+                  id="owner-whatsapp"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  placeholder="+5491160068637"
+                  value={ownerWhatsappText}
+                  onChange={(event) =>
+                    setOwnerWhatsappText(event.target.value.replace(/[^\d+]/g, ''))
+                  }
+                />
+              </Field>
             )}
           </div>
         </div>

@@ -18,16 +18,27 @@ interface SettingsBody {
   showOptionalBookingFields?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyStampsGoal?: number;
+  ownerWhatsapp?: string | null;
 }
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const E164_PATTERN = /^\+\d{8,15}$/;
 
 function isSlotInterval(value: number): value is SlotInterval {
   return (SLOT_INTERVALS as readonly number[]).includes(value);
 }
 
-/** GET /api/settings */
+/**
+ * GET /api/settings — sólo admin.
+ *
+ * El objeto `Settings` incluye datos sensibles (`ownerWhatsapp`), así que
+ * este endpoint NO es público. El sitio público no lo usa: las páginas del
+ * server toman la config directo con `getSettings()`.
+ */
 export async function GET(): Promise<NextResponse> {
+  const guard = await requireAdmin();
+  if ('response' in guard) return guard.response;
+
   const settings = await getSettings();
   return NextResponse.json({ settings });
 }
@@ -103,6 +114,27 @@ export async function PUT(request: Request): Promise<NextResponse> {
       );
     }
     patch.loyaltyStampsGoal = value as (typeof LOYALTY_STAMPS_GOALS)[number];
+  }
+
+  if (body.ownerWhatsapp !== undefined) {
+    const raw =
+      typeof body.ownerWhatsapp === 'string' ? body.ownerWhatsapp.trim() : '';
+    if (raw === '') {
+      patch.ownerWhatsapp = null;
+    } else {
+      const digits = raw.replace(/\D/g, '');
+      const normalized = `+${digits}`;
+      if (!E164_PATTERN.test(normalized)) {
+        return NextResponse.json(
+          {
+            error:
+              'El WhatsApp de aviso debe estar en formato internacional, ej. +5491160068637',
+          },
+          { status: 400 },
+        );
+      }
+      patch.ownerWhatsapp = normalized;
+    }
   }
 
   if (patch.depositEnabled) {

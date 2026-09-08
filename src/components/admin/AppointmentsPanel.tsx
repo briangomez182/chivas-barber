@@ -413,7 +413,7 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                     direction={sortDir}
                     onSort={toggleSort}
                   />
-                  <th scope="col" className="px-6 py-4 text-right">Acciones</th>
+                  <th scope="col" className="px-4 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -424,21 +424,21 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.03 }}
                   >
-                    <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                    <td className="whitespace-nowrap px-4 py-4 font-semibold text-ink">
                       {formatShortDate(appointment.date)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4">
+                    <td className="whitespace-nowrap px-4 py-4">
                       <p className="font-bold text-ink">{appointment.time}</p>
                       <p className="text-xs text-ink-muted">
                         {formatDuration(appointment.durationMin)}
                       </p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <p className="font-semibold text-ink">
                         {appointment.customerName}
                       </p>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4">
+                    <td className="whitespace-nowrap px-4 py-4">
                       <label className="sr-only" htmlFor={`barber-${appointment.id}`}>
                         Barbero de {appointment.customerName}
                       </label>
@@ -460,10 +460,10 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                         )}
                       </select>
                     </td>
-                    <td className="px-6 py-4 text-ink-soft">
+                    <td className="px-4 py-4 text-ink-soft">
                       {serviceName(appointment.serviceId)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4">
+                    <td className="whitespace-nowrap px-4 py-4">
                       <p className="font-semibold text-ink">
                         {appointment.amount !== null ? formatPrice(appointment.amount) : '—'}
                       </p>
@@ -471,17 +471,17 @@ export function AppointmentsPanel({ barbers, services, settings }: AppointmentsP
                         <p className="text-xs text-ink-muted">MP: {appointment.paymentStatus}</p>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                    <td className="whitespace-nowrap px-4 py-4 font-semibold text-ink">
                       {debtLabel(appointment)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <span
                         className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[appointment.status]}`}
                       >
                         {STATUS_LABELS[appointment.status]}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                    <td className="whitespace-nowrap px-4 py-4 text-right">
                       <div className="inline-flex items-center gap-1">
                         <IconButton
                           label={`Copiar teléfono de ${appointment.customerName}`}

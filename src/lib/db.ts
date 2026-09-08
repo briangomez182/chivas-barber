@@ -1,15 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { customerPhoneDigits } from './brand';
 import { supabaseAdmin } from './supabase/admin';
 import {
   LOYALTY_STAMPS_GOALS,
   SLOT_INTERVALS,
   type Appointment,
+  type AppointmentNotification,
   type AppointmentStatus,
   type Barber,
   type BarberPortfolioImage,
   type LoyaltyCard,
   type LoyaltyStampsGoal,
+  type NotificationStatus,
   type PaymentStatus,
   type Profile,
   type ScheduleBlock,
@@ -47,6 +50,7 @@ interface SettingsRow {
   show_optional_booking_fields: boolean;
   loyalty_enabled: boolean;
   loyalty_stamps_goal: number;
+  owner_whatsapp: string | null;
 }
 
 interface BarberRow {
@@ -139,6 +143,44 @@ function toSettings(row: SettingsRow): Settings {
     loyaltyStampsGoal: isLoyaltyStampsGoal(row.loyalty_stamps_goal)
       ? row.loyalty_stamps_goal
       : 10,
+    ownerWhatsapp: row.owner_whatsapp ?? null,
+  };
+}
+
+const NOTIFICATION_COLUMNS =
+  'id, appointment_id, kind, channel, recipient, status, attempts, last_error, payload, provider_message_id, next_retry_at, created_at, sent_at';
+
+interface NotificationRow {
+  id: string;
+  appointment_id: string;
+  kind: string;
+  channel: string;
+  recipient: string;
+  status: NotificationStatus;
+  attempts: number;
+  last_error: string | null;
+  payload: Record<string, unknown> | null;
+  provider_message_id: string | null;
+  next_retry_at: string | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
+function toNotification(row: NotificationRow): AppointmentNotification {
+  return {
+    id: row.id,
+    appointmentId: row.appointment_id,
+    kind: row.kind,
+    channel: row.channel,
+    recipient: row.recipient,
+    status: row.status,
+    attempts: row.attempts,
+    lastError: row.last_error,
+    payload: row.payload,
+    providerMessageId: row.provider_message_id,
+    nextRetryAt: row.next_retry_at,
+    createdAt: row.created_at,
+    sentAt: row.sent_at,
   };
 }
 
@@ -226,7 +268,7 @@ function isMalformedId(error: { code?: string } | null): boolean {
 // ---------------------------------------------------------------------------
 
 const SETTINGS_COLUMNS =
-  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count, show_optional_booking_fields, loyalty_enabled, loyalty_stamps_goal';
+  'slot_interval_min, opening_time, closing_time, working_days, buffer_min, deposit_amount, deposit_enabled, show_pagination_count, show_optional_booking_fields, loyalty_enabled, loyalty_stamps_goal, owner_whatsapp';
 
 export async function getSettings(): Promise<Settings> {
   const { data, error } = await supabaseAdmin()
@@ -257,6 +299,8 @@ export interface SettingsPatch {
   showOptionalBookingFields?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyStampsGoal?: LoyaltyStampsGoal;
+  /** `null` explícito borra el número (desactiva el aviso). */
+  ownerWhatsapp?: string | null;
 }
 
 export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
@@ -280,6 +324,7 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   if (patch.loyaltyStampsGoal !== undefined) {
     row.loyalty_stamps_goal = patch.loyaltyStampsGoal;
   }
+  if (patch.ownerWhatsapp !== undefined) row.owner_whatsapp = patch.ownerWhatsapp;
 
   if (Object.keys(row).length === 0) return getSettings();
 
@@ -1290,4 +1335,162 @@ export async function adjustLoyaltyStamp(
   }
 
   return { card: toLoyaltyCard(data) };
+}
+
+// ---------------------------------------------------------------------------
+// Notificaciones (outbox) — ver supabase/migrations/0015 y lib/notifications.ts
+// ---------------------------------------------------------------------------
+
+export interface CreateNotificationInput {
+  appointmentId: string;
+  kind: string;
+  channel: string;
+  recipient: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Encola una notificación salvo que ya exista una para el mismo
+ * `(appointment_id, kind)` — `on conflict do nothing` vía `upsert` con
+ * `ignoreDuplicates`. Devuelve la fila recién creada, o `null` si ya había
+ * una (caso típico: Mercado Pago reenvía el webhook del mismo pago). El
+ * `null` es la señal de "no reenviar".
+ */
+export async function createNotificationIfAbsent(
+  input: CreateNotificationInput,
+): Promise<AppointmentNotification | null> {
+  const { data, error } = await supabaseAdmin()
+    .from('notifications')
+    .upsert(
+      {
+        appointment_id: input.appointmentId,
+        kind: input.kind,
+        channel: input.channel,
+        recipient: input.recipient,
+        payload: input.payload,
+      },
+      { onConflict: 'appointment_id,kind', ignoreDuplicates: true },
+    )
+    .select(NOTIFICATION_COLUMNS)
+    .maybeSingle<NotificationRow>();
+
+  if (error) fail('encolar notificación', error);
+  return data ? toNotification(data) : null;
+}
+
+/**
+ * Notificaciones que el cron puede intentar ahora: `pending` y con
+ * `next_retry_at` vencido (o sin fecha). Orden FIFO por `created_at`.
+ */
+export async function listDispatchableNotifications(
+  limit: number,
+): Promise<AppointmentNotification[]> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin()
+    .from('notifications')
+    .select(NOTIFICATION_COLUMNS)
+    .eq('status', 'pending')
+    .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
+    .order('created_at', { ascending: true })
+    .limit(limit)
+    .returns<NotificationRow[]>();
+
+  if (error) fail('listar notificaciones pendientes', error);
+  return (data ?? []).map(toNotification);
+}
+
+export interface NotificationPatch {
+  status?: NotificationStatus;
+  attempts?: number;
+  lastError?: string | null;
+  providerMessageId?: string | null;
+  nextRetryAt?: string | null;
+  sentAt?: string | null;
+}
+
+export async function updateNotification(
+  id: string,
+  patch: NotificationPatch,
+): Promise<void> {
+  const row: Partial<NotificationRow> = {};
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.attempts !== undefined) row.attempts = patch.attempts;
+  if (patch.lastError !== undefined) row.last_error = patch.lastError;
+  if (patch.providerMessageId !== undefined) {
+    row.provider_message_id = patch.providerMessageId;
+  }
+  if (patch.nextRetryAt !== undefined) row.next_retry_at = patch.nextRetryAt;
+  if (patch.sentAt !== undefined) row.sent_at = patch.sentAt;
+
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await supabaseAdmin()
+    .from('notifications')
+    .update(row)
+    .eq('id', id);
+
+  if (error) fail('actualizar notificación', error);
+}
+
+// ---------------------------------------------------------------------------
+// Clientes — no hay tabla de clientes; se derivan de `appointments`
+// ---------------------------------------------------------------------------
+
+export interface CustomerHit {
+  /** Nombre tal cual quedó guardado en el turno más reciente. */
+  name: string;
+  /**
+   * Teléfono normalizado a dígitos con código de país
+   * (`customerPhoneDigits`) — es la clave con la que se deduplica y la que
+   * se usa después para buscar la tarjeta de lealtad.
+   */
+  phone: string;
+}
+
+/**
+ * Busca clientes por nombre (coincidencia parcial, sin distinción de
+ * mayúsculas/acentos según la config de la base) para el autocompletado del
+ * panel. Como no hay tabla de clientes, se sacan de `appointments`: se traen
+ * los turnos más recientes que matchean y se deduplica por teléfono,
+ * quedando el nombre del turno más nuevo de cada cliente.
+ *
+ * La clave de deduplicación es el teléfono NORMALIZADO (`customerPhoneDigits`,
+ * misma regla que `normalize_loyalty_phone` en la base): un mismo cliente
+ * puede tener turnos guardados como `1133691609` (alta manual, sin prefijo) y
+ * como `541133691609` (reserva web) — son strings distintos pero el mismo
+ * número, así que sin normalizar aparecían dos veces.
+ */
+export async function searchCustomersByName(
+  query: string,
+  limit = 8,
+): Promise<CustomerHit[]> {
+  // Se sacan `%` y `_` para que no actúen como comodines de LIKE (un nombre
+  // no los lleva) y `\` para no dejar un escape colgando.
+  const term = query.trim().replace(/[%_\\]/g, '');
+  if (term.length < 2) return [];
+
+  const { data, error } = await supabaseAdmin()
+    .from('appointments')
+    .select('customer_name, customer_phone, created_at')
+    .ilike('customer_name', `%${term}%`)
+    .order('created_at', { ascending: false })
+    .limit(300)
+    .returns<
+      { customer_name: string; customer_phone: string; created_at: string }[]
+    >();
+
+  if (error) fail('buscar clientes por nombre', error);
+
+  const seen = new Set<string>();
+  const hits: CustomerHit[] = [];
+  for (const row of data ?? []) {
+    const raw = (row.customer_phone ?? '').replace(/\D/g, '');
+    if (!raw) continue;
+    const phone = customerPhoneDigits(raw);
+    if (seen.has(phone)) continue;
+    seen.add(phone);
+    hits.push({ name: row.customer_name, phone });
+    if (hits.length >= limit) break;
+  }
+  return hits;
 }

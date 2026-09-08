@@ -77,7 +77,7 @@ export function AdminDashboard({
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/85 backdrop-blur-xl">
-        <div className="container-page flex h-[72px] items-center justify-between gap-6">
+        <div className="container-wide flex h-[72px] items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <Logo />
             <span className="hidden rounded-full bg-ink px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white sm:inline-block">
@@ -89,6 +89,9 @@ export function AdminDashboard({
             <span className="hidden text-sm text-ink-soft sm:inline">
               Hola, <strong className="font-semibold text-ink">{adminName}</strong>
             </span>
+            <Link href="/admin/turnero" className="pill-primary text-sm">
+              Turnero
+            </Link>
             <Link href="/" className="pill-ghost text-sm">
               Ver sitio
             </Link>
@@ -98,7 +101,7 @@ export function AdminDashboard({
           </div>
         </div>
 
-        <nav aria-label="Secciones del panel" className="container-page">
+        <nav aria-label="Secciones del panel" className="container-wide">
           <ul className="flex gap-1 overflow-x-auto pb-3">
             {visibleTabs.map((item) => {
               const active = item.id === tab;
@@ -128,7 +131,7 @@ export function AdminDashboard({
         </nav>
       </header>
 
-      <main className="container-page py-12">
+      <main className="container-wide py-12">
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}

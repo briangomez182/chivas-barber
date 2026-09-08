@@ -102,6 +102,38 @@ export interface Settings {
   loyaltyEnabled: boolean;
   /** Sellos necesarios para completar la tarjeta y ganar un corte gratis. */
   loyaltyStampsGoal: LoyaltyStampsGoal;
+  /**
+   * Teléfono del dueño en formato internacional (ej. `+5491160068637`) que
+   * recibe un aviso por WhatsApp cuando un cliente paga la seña de un turno.
+   * `null` = la notificación queda desactivada.
+   */
+  ownerWhatsapp: string | null;
+}
+
+/** Estado de una fila de la cola de notificaciones (`public.notifications`). */
+export type NotificationStatus = 'pending' | 'sent' | 'failed';
+
+/**
+ * Aviso encolado en la outbox — hoy sólo `kind: 'deposit_paid'` (WhatsApp al
+ * dueño cuando se paga una seña). Lo maneja `lib/notifications.ts`.
+ */
+export interface AppointmentNotification {
+  id: string;
+  appointmentId: string;
+  kind: string;
+  channel: string;
+  /** Destinatario congelado al momento de encolar. */
+  recipient: string;
+  status: NotificationStatus;
+  attempts: number;
+  lastError: string | null;
+  /** Snapshot de los datos del mensaje (incluye `bodyParams`). */
+  payload: Record<string, unknown> | null;
+  providerMessageId: string | null;
+  /** Cuándo puede reintentarse (backoff); `null` = ya. */
+  nextRetryAt: string | null;
+  createdAt: string;
+  sentAt: string | null;
 }
 
 export interface Appointment {
@@ -154,6 +186,36 @@ export interface Slot {
   endTime: string;
   available: boolean;
   reason?: 'taken' | 'past' | 'closed' | 'blocked';
+}
+
+/** Estado de un bloque en la vista Turnero. */
+export type TurneroBlockState = 'booked' | 'free' | 'blocked';
+
+/**
+ * Uno de los próximos bloques de la agenda del barbero para el Turnero.
+ * `time`/`endTime` en `null` = fila de relleno (la jornada ya no tiene más
+ * bloques), se muestra igual como "Libre".
+ */
+export interface TurneroBlock {
+  time: string | null;
+  endTime: string | null;
+  state: TurneroBlockState;
+  /** Turno que ocupa el bloque — sólo si `state === 'booked'`. */
+  appointment: Appointment | null;
+  /** Motivo del bloqueo — sólo si `state === 'blocked'`. */
+  blockedReason: string | null;
+}
+
+/** Respuesta de `GET /api/turnero` — lo que consume la vista en vivo. */
+export interface TurneroSnapshot {
+  /** Fecha de hoy (huso de la barbería), `YYYY-MM-DD`. */
+  date: string;
+  barberId: string;
+  barberName: string;
+  /** Siempre 3 bloques (con relleno "Libre" si faltan). */
+  blocks: TurneroBlock[];
+  /** Turnos de hoy no cancelados, ordenados por hora — para detectar altas. */
+  today: Appointment[];
 }
 
 /**

@@ -335,7 +335,7 @@ export function EditorTurnosPanel({
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/85 backdrop-blur-xl">
-        <div className="container-page flex h-[72px] items-center justify-between gap-6">
+        <div className="container-wide flex h-[72px] items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <Logo />
             <span className="hidden rounded-full bg-ink px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white sm:inline-block">
@@ -347,6 +347,9 @@ export function EditorTurnosPanel({
             <span className="hidden text-sm text-ink-soft sm:inline">
               Hola, <strong className="font-semibold text-ink">{editorName}</strong>
             </span>
+            <Link href="/admin/turnero" className="pill-primary text-sm">
+              Turnero
+            </Link>
             <Link href="/" className="pill-ghost text-sm">
               Ver sitio
             </Link>
@@ -357,7 +360,7 @@ export function EditorTurnosPanel({
         </div>
       </header>
 
-      <main className="container-page py-12">
+      <main className="container-wide py-12">
         <section aria-labelledby="editor-appointments-title">
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -455,7 +458,7 @@ export function EditorTurnosPanel({
                         direction={sortDir}
                         onSort={toggleSort}
                       />
-                      <th scope="col" className="px-6 py-4 text-right">Acciones</th>
+                      <th scope="col" className="px-4 py-4 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -466,32 +469,32 @@ export function EditorTurnosPanel({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.03 }}
                       >
-                        <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                        <td className="whitespace-nowrap px-4 py-4 font-semibold text-ink">
                           {formatShortDate(appointment.date)}
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4">
+                        <td className="whitespace-nowrap px-4 py-4">
                           <p className="font-bold text-ink">{appointment.time}</p>
                           <p className="text-xs text-ink-muted">
                             {formatDuration(appointment.durationMin)}
                           </p>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <p className="font-semibold text-ink">{appointment.customerName}</p>
                         </td>
-                        <td className="px-6 py-4 text-ink-soft">
+                        <td className="px-4 py-4 text-ink-soft">
                           {serviceName(appointment.serviceId)}
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4 font-semibold text-ink">
+                        <td className="whitespace-nowrap px-4 py-4 font-semibold text-ink">
                           {debtLabel(appointment)}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <span
                             className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${STATUS_STYLES[appointment.status]}`}
                           >
                             {STATUS_LABELS[appointment.status]}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right">
+                        <td className="whitespace-nowrap px-4 py-4 text-right">
                           <div className="inline-flex items-center gap-1">
                             <IconButton
                               label={`Copiar teléfono de ${appointment.customerName}`}

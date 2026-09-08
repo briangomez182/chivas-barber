@@ -135,6 +135,46 @@ export function CalendarIcon({ className = 'h-4 w-4' }: IconProps) {
   );
 }
 
+/** Flechas hacia las esquinas — entrar a pantalla completa. */
+export function ExpandIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="9 3 3 3 3 9" />
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="21 15 21 21 15 21" />
+      <polyline points="3 15 3 21 9 21" />
+    </svg>
+  );
+}
+
+/** Flechas hacia el centro — salir de pantalla completa. */
+export function CompressIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="3 9 9 9 9 3" />
+      <polyline points="21 9 15 9 15 3" />
+      <polyline points="15 21 15 15 21 15" />
+      <polyline points="9 21 9 15 3 15" />
+    </svg>
+  );
+}
+
 /** Tijera — sello de la tarjeta de lealtad. */
 export function ScissorsIcon({ className = 'h-4 w-4' }: IconProps) {
   return (

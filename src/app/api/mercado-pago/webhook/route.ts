@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { updateAppointmentPayment } from '@/lib/db';
 import { getPayment, verifyWebhookSignature } from '@/lib/mercadopago';
+import { enqueueDepositPaidNotification } from '@/lib/notifications';
 import type { PaymentStatus } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -73,11 +74,26 @@ export async function POST(request: Request): Promise<NextResponse> {
           ? ('cancelled' as const)
           : null; // pending / in_process / authorized / in_mediation: se mantiene pending_payment
 
-    await updateAppointmentPayment(appointmentId, {
+    const appointment = await updateAppointmentPayment(appointmentId, {
       paymentId: dataId,
       paymentStatus,
       newStatus,
     });
+
+    // Pago aprobado → avisar al dueño por WhatsApp. `enqueue...` es
+    // idempotente (unique appointment_id+kind), así que los reintentos del
+    // webhook no generan mensajes duplicados. No debe romper la respuesta
+    // 200: si algo falla, el aviso queda en la cola para el cron.
+    if (appointment && paymentStatus === 'approved') {
+      try {
+        await enqueueDepositPaidNotification(appointment);
+      } catch (cause) {
+        console.error(
+          '[chivas] No se pudo encolar la notificación de WhatsApp del turno',
+          cause,
+        );
+      }
+    }
 
     return NextResponse.json({ ok: true });
   } catch (cause) {

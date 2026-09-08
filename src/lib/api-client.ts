@@ -9,6 +9,7 @@ import type {
   Session,
   Settings,
   Slot,
+  TurneroSnapshot,
 } from './types';
 
 interface TrackedAppointment {
@@ -235,6 +236,29 @@ export const api = {
     remove: (id: string) =>
       apiFetch<{ ok: true }>(`/api/users/${id}`, { method: 'DELETE' }),
   },
+  turnero: {
+    /** Foto del día para la vista Turnero. `barberId` sólo lo manda el admin. */
+    get: (barberId?: string) =>
+      apiFetch<TurneroSnapshot>(
+        `/api/turnero${barberId ? `?barberId=${encodeURIComponent(barberId)}` : ''}`,
+      ),
+    /** TEMPORAL: crea un turno de prueba (seña "paga") para probar el Turnero. */
+    createTest: (barberId?: string) =>
+      apiFetch<{
+        ok: true;
+        appointment: { id: string; time: string; customerName: string; amount: number };
+      }>('/api/turnero/test', {
+        method: 'POST',
+        body: JSON.stringify(barberId ? { barberId } : {}),
+      }),
+  },
+  customers: {
+    /** Autocompletado de clientes por nombre (sólo admin). */
+    search: (q: string) =>
+      apiFetch<{ customers: { name: string; phone: string }[] }>(
+        `/api/customers/search?q=${encodeURIComponent(q)}`,
+      ),
+  },
   loyalty: {
     /** Consulta pública de la tarjeta de sellos por teléfono (dígitos con prefijo). */
     lookup: (phone: string) =>
@@ -254,19 +278,6 @@ export const api = {
         '/api/auth/login',
         { method: 'POST', body: JSON.stringify({ email, password }) },
       ),
-    register: (data: {
-      name: string;
-      email: string;
-      phone: string;
-      password: string;
-    }) =>
-      apiFetch<{
-        user: { id: string; name: string };
-        needsEmailConfirmation?: boolean;
-      }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
     logout: () => apiFetch<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
     me: () => apiFetch<{ session: Session | null }>('/api/auth/me'),
   },

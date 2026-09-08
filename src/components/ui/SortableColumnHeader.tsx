@@ -27,7 +27,7 @@ export function SortableColumnHeader<Key extends string>({
   const active = activeKey === sortKey;
 
   return (
-    <th scope="col" className={`px-6 py-4 ${align === 'right' ? 'text-right' : ''}`}>
+    <th scope="col" className={`px-4 py-4 ${align === 'right' ? 'text-right' : ''}`}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
