@@ -217,7 +217,7 @@ function BarberCard({ barber, index, onSelect }: BarberCardProps) {
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-col items-center"
       >
-        <BarberAvatar name={barber.name} photoUrl={barber.photoUrl} size={128} />
+        <BarberAvatar name={barber.name} photoUrl={barber.photoUrl} size={154} />
 
         <h3 className="mt-6 text-xl font-extrabold tracking-[-0.02em] text-ink">
           {barber.name}
