@@ -72,14 +72,6 @@ export function SiteFooter() {
             ))}
             <li>
               <Link
-                href="/register"
-                className="text-ink-soft transition-colors hover:text-brand"
-              >
-                Crear cuenta
-              </Link>
-            </li>
-            <li>
-              <Link
                 href="/login"
                 className="text-ink-soft transition-colors hover:text-brand"
               >

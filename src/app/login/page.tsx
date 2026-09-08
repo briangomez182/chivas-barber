@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { AuthShell } from '@/components/auth/AuthShell';
 import { LoginForm } from '@/components/auth/LoginForm';
@@ -16,14 +15,6 @@ export default function LoginPage() {
     <AuthShell
       title="Ingresá al panel"
       subtitle="Administrá barberos, servicios y la configuración de la agenda."
-      footer={
-        <p>
-          ¿Sos cliente?{' '}
-          <Link href="/register" className="font-semibold text-brand hover:underline">
-            Creá tu cuenta
-          </Link>
-        </p>
-      }
     >
       <Suspense
         fallback={<div className="h-64 animate-pulse rounded-2xl bg-gray-100" />}

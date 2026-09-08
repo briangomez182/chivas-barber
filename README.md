@@ -78,7 +78,6 @@ Preparación, una sola vez:
 | ----------- | --------- | ------------------------------------------------------------------------ |
 | `/`         | Server    | Hero 3D, servicios, barberos, widget de agenda y footer                  |
 | `/login`    | Server    | Acceso a administración (formulario cliente dentro de `Suspense`)        |
-| `/register` | Server    | Alta de clientes                                                          |
 | `/admin`    | Server    | Dashboard protegido por `middleware.ts` + verificación en el server      |
 | `not-found` | Client    | 404 interactiva con parallax de cursor                                    |
 
@@ -98,7 +97,7 @@ Preparación, una sola vez:
 | `POST`             | `/api/appointments`                   | —     |
 | `GET`              | `/api/appointments?date=`             | admin |
 | `PATCH` / `DELETE` | `/api/appointments/:id`               | admin |
-| `POST`             | `/api/auth/login` · `logout` · `register` | —  |
+| `POST`             | `/api/auth/login` · `logout`          | —     |
 | `GET`              | `/api/auth/me`                        | —     |
 
 ---
@@ -112,7 +111,7 @@ src/
 │   ├── page.tsx              # landing (Server Component)
 │   ├── not-found.tsx         # 404 interactiva
 │   ├── error.tsx             # error boundary global
-│   ├── login/ · register/ · admin/
+│   ├── login/ · admin/
 │   └── api/…                 # Route Handlers
 ├── components/
 │   ├── hero/                 # Hero + escena 3D (ClipperScene, ClipperModel)
@@ -180,8 +179,9 @@ servidor.
   `SELECT` y el `INSERT` donde dos reservas simultáneas toman el mismo hueco.
 - **RLS**: activo en todas las tablas y sin policies, así las claves públicas
   no acceden a nada. El único camino a los datos es el servidor.
-- **Auth**: Supabase Auth de punta a punta — `signInWithPassword` / `signUp`
-  en `/api/auth/login` y `/register` (`lib/supabase/server.ts`), sesión en
+- **Auth**: Supabase Auth de punta a punta — `signInWithPassword` en
+  `/api/auth/login` (`lib/supabase/server.ts`), sin alta pública: los barberos
+  los crea un admin desde el panel. Sesión en
   cookies `httpOnly` que gestiona `@supabase/ssr` (no hay JWT propio ni
   hashing manual de este lado). `middleware.ts` llama a
   `supabase.auth.getUser()` para proteger `/admin` en el Edge Runtime, y

@@ -7,10 +7,10 @@ interface AuthShellProps {
   title: string;
   subtitle: string;
   children: React.ReactNode;
-  footer: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
-/** Layout partido para /login y /register: formulario + panel de marca. */
+/** Layout partido para /login: formulario + panel de marca. */
 export function AuthShell({
   title,
   subtitle,
@@ -45,7 +45,11 @@ export function AuthShell({
           <div className="mt-9">{children}</div>
         </section>
 
-        <footer className="text-xs text-ink-muted">{footer}</footer>
+        {footer ? (
+          <footer className="text-xs text-ink-muted">{footer}</footer>
+        ) : (
+          <div />
+        )}
       </div>
 
       {/* Panel de marca */}
