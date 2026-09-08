@@ -165,9 +165,8 @@ export function TurneroView({
   // Modal recordatorio: aparece en cada carga/recarga si el navegador tiene
   // el audio bloqueado por la política de autoplay (contexto `suspended`).
   const [needsSoundUnlock, setNeedsSoundUnlock] = useState<boolean>(false);
-  // TEMPORAL: botón "Turno de prueba". Visible en dev, o en prod con `?test`
-  // en la URL. Quitar junto con /api/turnero/test cuando no se use más.
-  const [testMode, setTestMode] = useState<boolean>(false);
+  // TEMPORAL: botón "Turno de prueba" (siempre visible para staff). Quitar
+  // junto con /api/turnero/test cuando no se use más.
   const [creatingTest, setCreatingTest] = useState<boolean>(false);
   // Vista previa manual de la animación de avance de la agenda.
   const [previewShift, setPreviewShift] = useState<boolean>(false);
@@ -244,18 +243,6 @@ export function TurneroView({
       void document.exitFullscreen();
     } else {
       void rootRef.current?.requestFullscreen?.();
-    }
-  }, []);
-
-  // TEMPORAL: habilita el botón de turno de prueba.
-  useEffect(() => {
-    try {
-      setTestMode(
-        process.env.NODE_ENV !== 'production' ||
-          new URLSearchParams(window.location.search).has('test'),
-      );
-    } catch {
-      /* ignore */
     }
   }, []);
 
@@ -464,16 +451,14 @@ export function TurneroView({
             </button>
 
             {/* TEMPORAL: crear un turno de prueba con seña "paga". */}
-            {testMode && (
-              <button
-                type="button"
-                onClick={() => void createTestTurn()}
-                disabled={creatingTest || (role === 'admin' && !barberId)}
-                className="rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40"
-              >
-                {creatingTest ? 'Creando…' : '🧪 Turno de prueba'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => void createTestTurn()}
+              disabled={creatingTest || (role === 'admin' && !barberId)}
+              className="rounded-full border border-dashed border-amber-400 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-40"
+            >
+              {creatingTest ? 'Creando…' : '🧪 Turno de prueba'}
+            </button>
 
             <button
               type="button"
