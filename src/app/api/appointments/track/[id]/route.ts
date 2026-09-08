@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getAppointment, getBarber, getService } from '@/lib/db';
+import { getAppointment, getBarber, getService, getSettings } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +28,17 @@ export async function GET(
     return NextResponse.json({ error: 'Turno no encontrado' }, { status: 404 });
   }
 
-  const [barber, service] = await Promise.all([
+  const [barber, service, settings] = await Promise.all([
     getBarber(appointment.barberId),
     appointment.serviceId ? getService(appointment.serviceId) : null,
+    getSettings(),
   ]);
 
   return NextResponse.json({
+    // Switch "Cobrar seña online" del admin: cuando está activo, la pantalla
+    // de retorno oculta el "Volver al inicio" y deja sólo el botón de
+    // WhatsApp, para empujar al cliente a mandar el mensaje.
+    depositEnabled: settings.depositEnabled,
     appointment: {
       id: appointment.id,
       date: appointment.date,

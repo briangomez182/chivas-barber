@@ -173,7 +173,9 @@ export const api = {
       apiFetch<{ ok: true }>(`/api/appointments/${id}`, { method: 'DELETE' }),
     /** Seguimiento público y acotado, usado en /booking/success|pending|failure. */
     track: (id: string) =>
-      apiFetch<{ appointment: TrackedAppointment }>(`/api/appointments/track/${id}`),
+      apiFetch<{ appointment: TrackedAppointment; depositEnabled: boolean }>(
+        `/api/appointments/track/${id}`,
+      ),
   },
   /** Reserva pública con cobro: crea el turno `pending_payment` + preferencia de MP. */
   checkout: (data: Record<string, unknown>) =>

@@ -29,6 +29,21 @@ function almostThereMessage(): string {
   );
 }
 
+/**
+ * Mensaje de WhatsApp para el cliente que ya completó la tarjeta y tiene uno
+ * o más cortes gratis disponibles para usar.
+ */
+function rewardReadyMessage(stampsGoal: number, rewards: number): string {
+  const reward = rewards === 1 ? 'un corte gratis' : `${rewards} cortes gratis`;
+
+  return (
+    `¡Hola! Te escribimos de ${BRAND.name}. ` +
+    `¡Completaste tu Tarjeta de Fidelización! Tenés ${reward} por completar ` +
+    `${stampsGoal} servicios con nosotros. ` +
+    'Cuando quieras coordinamos tu turno para que lo aproveches. ¡Te esperamos!'
+  );
+}
+
 interface LoyaltyPanelProps {
   /** Sellos necesarios para completar la tarjeta (`settings.loyaltyStampsGoal`). */
   stampsGoal: number;
@@ -390,6 +405,31 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
                 </p>
                 <a
                   href={customerWhatsappLink(cardPhone, almostThereMessage())}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="pill mt-3 w-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]"
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                  Avisar al cliente por WhatsApp
+                </a>
+                <p className="mt-2 text-xs text-emerald-800/80">
+                  Se abre WhatsApp con un mensaje listo para enviar.
+                </p>
+              </div>
+            )}
+
+            {card.rewardsEarned > 0 && (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-sm font-semibold text-emerald-900">
+                  {card.rewardsEarned === 1
+                    ? 'Completó la tarjeta: tiene un corte gratis para usar.'
+                    : `Completó la tarjeta: tiene ${card.rewardsEarned} cortes gratis para usar.`}
+                </p>
+                <a
+                  href={customerWhatsappLink(
+                    cardPhone,
+                    rewardReadyMessage(stampsGoal, card.rewardsEarned),
+                  )}
                   target="_blank"
                   rel="noreferrer noopener"
                   className="pill mt-3 w-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]"

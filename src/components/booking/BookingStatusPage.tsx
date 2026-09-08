@@ -47,6 +47,9 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
   const appointmentId = searchParams.get('external_reference');
 
   const [appointment, setAppointment] = useState<TrackedAppointment | null>(null);
+  // Switch "Cobrar seña online" del admin: si está activo, esta pantalla
+  // esconde el "Volver al inicio" y deja sólo el botón de WhatsApp.
+  const [depositEnabled, setDepositEnabled] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
   const attemptsRef = useRef<number>(0);
@@ -62,10 +65,12 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
 
     const poll = async (): Promise<void> => {
       try {
-        const { appointment: found } = await api.appointments.track(appointmentId);
+        const { appointment: found, depositEnabled: deposit } =
+          await api.appointments.track(appointmentId);
         if (cancelled) return;
 
         setAppointment(found);
+        setDepositEnabled(deposit);
         setLoading(false);
 
         const stillWaiting = found.status === 'pending_payment';
@@ -206,9 +211,11 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
           >
             Escribir por WhatsApp
           </a>
-          <Link href="/" className="pill-primary flex-1">
-            Volver al inicio
-          </Link>
+          {!depositEnabled && (
+            <Link href="/" className="pill-primary flex-1">
+              Volver al inicio
+            </Link>
+          )}
         </div>
 
         <p className="mt-4 text-xs text-ink-muted">
