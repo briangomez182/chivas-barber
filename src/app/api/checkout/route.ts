@@ -87,6 +87,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 422 },
     );
   }
+  if (service.barberId !== barberId) {
+    return NextResponse.json(
+      { error: 'El servicio elegido no pertenece a ese barbero' },
+      { status: 422 },
+    );
+  }
 
   // Se cobra la seña configurada por el admin (Configuraciones › Pagos), no
   // el precio del servicio — el resto se abona en el local.

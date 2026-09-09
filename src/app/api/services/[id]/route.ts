@@ -35,7 +35,6 @@ export async function PATCH(
   if (Number.isFinite(Number(body.price))) {
     patch.price = Math.round(Number(body.price));
   }
-  if (typeof body.featured === 'boolean') patch.featured = body.featured;
 
   const service = await updateService(id, patch);
 

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import {
   deleteAppointment,
   getAppointment,
+  getService,
   rescheduleAppointment,
   setAppointmentStatus,
 } from '@/lib/db';
@@ -99,11 +100,31 @@ export async function PATCH(
     return NextResponse.json({ error: 'Turno no encontrado' }, { status: 404 });
   }
 
+  const nextBarberId = body.barberId ?? existing.barberId;
+  let nextServiceId =
+    body.serviceId !== undefined ? body.serviceId : existing.serviceId;
+
+  // El servicio tiene que ser de la carta del barbero del turno. Si vino uno
+  // explícito que no corresponde, se rechaza; si el que quedó es de otro
+  // barbero (p. ej. al reasignar el turno), se descarta en silencio.
+  if (nextServiceId) {
+    const service = await getService(nextServiceId);
+    if (!service || service.barberId !== nextBarberId) {
+      if (body.serviceId) {
+        return NextResponse.json(
+          { error: 'El servicio elegido no pertenece a ese barbero' },
+          { status: 400 },
+        );
+      }
+      nextServiceId = null;
+    }
+  }
+
   const result = await rescheduleAppointment(
     id,
     {
-      barberId: body.barberId ?? existing.barberId,
-      serviceId: body.serviceId !== undefined ? body.serviceId : existing.serviceId,
+      barberId: nextBarberId,
+      serviceId: nextServiceId,
       date: body.date ?? existing.date,
       time: body.time ?? existing.time,
       durationMin: body.durationMin ?? existing.durationMin,

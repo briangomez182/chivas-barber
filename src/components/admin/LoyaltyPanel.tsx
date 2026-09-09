@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
+import { CustomerCombobox } from '@/components/admin/CustomerCombobox';
 import { LoyaltyStampCard } from '@/components/loyalty/LoyaltyStampCard';
-import { Field } from '@/components/ui/Field';
-import { SearchIcon, WhatsAppIcon } from '@/components/ui/icons';
+import { WhatsAppIcon } from '@/components/ui/icons';
 import { Toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
 import { BRAND, customerWhatsappLink, formatCustomerPhone } from '@/lib/brand';
@@ -12,11 +12,6 @@ import type { LoyaltyCard } from '@/lib/types';
 
 function onlyDigits(text: string): string {
   return text.replace(/\D/g, '');
-}
-
-interface CustomerHit {
-  name: string;
-  phone: string;
 }
 
 /** Mensaje de WhatsApp para el cliente al que le falta un solo sello. */
@@ -51,12 +46,13 @@ interface LoyaltyPanelProps {
 
 /**
  * Gestión de tarjetas de lealtad para el admin: busca un cliente por nombre
- * (con autocompletado) o pegando el teléfono, ve el estado de sus sellos y
- * suma/descuenta sellos a mano.
+ * o por teléfono (ambos campos con autocompletado), ve el estado de sus
+ * sellos y suma/descuenta sellos a mano.
  *
- * Como no hay tabla de clientes, el autocompletado de nombres sale de los
- * turnos (`/api/customers/search`). Al elegir una sugerencia se completa el
- * teléfono y se dispara la búsqueda con ese número.
+ * Como no hay tabla de clientes, el autocompletado sale de los turnos
+ * (`/api/customers/search`, por nombre o por teléfono). Al elegir una
+ * sugerencia se completan los dos campos y se dispara la búsqueda de la
+ * tarjeta con ese número.
  *
  * La tarjeta mostrada queda "anclada" al teléfono con el que se buscó
  * (`cardPhone`). Los botones de ajuste usan ESE teléfono, no lo que haya
@@ -73,17 +69,12 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- Autocompletado por nombre -------------------------------------------
+  // Texto de los campos de búsqueda (el autocompletado lo maneja
+  // `CustomerCombobox`); los dos se mantienen sincronizados al elegir un cliente.
   const [nameQuery, setNameQuery] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<CustomerHit[]>([]);
-  const [suggestOpen, setSuggestOpen] = useState<boolean>(false);
-  const [suggestLoading, setSuggestLoading] = useState<boolean>(false);
-  const [activeIndex, setActiveIndex] = useState<number>(-1);
-  // Se ignoran las respuestas viejas si llegan fuera de orden.
-  const searchSeq = useRef<number>(0);
-  // No volver a buscar cuando el cambio de texto viene de elegir una opción.
-  const skipNextSearch = useRef<boolean>(false);
-  const nameFieldRef = useRef<HTMLDivElement>(null);
+  // Si se lanzan dos consultas de tarjeta seguidas, sólo la última pinta su
+  // resultado.
+  const lookupSeq = useRef<number>(0);
 
   const runLookup = useCallback(
     async (digits: string, displayName?: string | null): Promise<void> => {
@@ -92,21 +83,31 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
         return;
       }
 
+      const seq = ++lookupSeq.current;
+
+      // Cada búsqueda arranca de cero: si quedó en pantalla la tarjeta de otro
+      // cliente (con su aviso de corte gratis y su botón de WhatsApp), se limpia
+      // antes de traer la nueva para no mezclar los datos de dos personas.
       setBusy(true);
       setError(null);
+      setCard(null);
+      setCardPhone('');
+      setCardName(null);
 
       try {
         const { card: found } = await api.loyalty.lookup(digits);
+        if (seq !== lookupSeq.current) return;
         setCard(found);
         setCardPhone(digits);
         setCardName(displayName ?? null);
       } catch (cause) {
+        if (seq !== lookupSeq.current) return;
         setError(cause instanceof Error ? cause.message : 'No se pudo consultar');
         setCard(null);
         setCardPhone('');
         setCardName(null);
       } finally {
-        setBusy(false);
+        if (seq === lookupSeq.current) setBusy(false);
       }
     },
     [],
@@ -117,86 +118,12 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
     void runLookup(onlyDigits(phoneInput));
   };
 
-  // Busca sugerencias con debounce cada vez que cambia el texto del nombre.
-  useEffect(() => {
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false;
-      return;
-    }
-
-    const term = nameQuery.trim();
-    if (term.length < 2) {
-      setSuggestions([]);
-      setSuggestLoading(false);
-      setSuggestOpen(false);
-      return;
-    }
-
-    setSuggestLoading(true);
-    const seq = ++searchSeq.current;
-    const timer = setTimeout(async () => {
-      try {
-        const { customers } = await api.customers.search(term);
-        if (seq !== searchSeq.current) return;
-        setSuggestions(customers);
-        setActiveIndex(customers.length > 0 ? 0 : -1);
-        setSuggestOpen(true);
-      } catch {
-        if (seq !== searchSeq.current) return;
-        setSuggestions([]);
-        setSuggestOpen(false);
-      } finally {
-        if (seq === searchSeq.current) setSuggestLoading(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [nameQuery]);
-
-  // Cierra el desplegable al hacer click fuera del campo.
-  useEffect(() => {
-    if (!suggestOpen) return;
-
-    function handleClickOutside(event: MouseEvent): void {
-      if (!nameFieldRef.current?.contains(event.target as Node)) {
-        setSuggestOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [suggestOpen]);
-
-  const selectSuggestion = (hit: CustomerHit): void => {
-    skipNextSearch.current = true;
+  // Al elegir un cliente en cualquiera de los dos autocompletados: se completan
+  // ambos campos y se trae su tarjeta.
+  const pickCustomer = (hit: { name: string; phone: string }): void => {
     setNameQuery(hit.name);
     setPhoneInput(formatCustomerPhone(hit.phone));
-    setSuggestions([]);
-    setSuggestOpen(false);
-    setActiveIndex(-1);
     void runLookup(onlyDigits(hit.phone), hit.name);
-  };
-
-  const handleNameKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ): void => {
-    if (!suggestOpen || suggestions.length === 0) return;
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActiveIndex((current) => Math.min(current + 1, suggestions.length - 1));
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActiveIndex((current) => Math.max(current - 1, 0));
-    } else if (event.key === 'Enter') {
-      const hit = suggestions[activeIndex];
-      if (hit) {
-        event.preventDefault();
-        selectSuggestion(hit);
-      }
-    } else if (event.key === 'Escape') {
-      setSuggestOpen(false);
-    }
   };
 
   const adjust = async (delta: 1 | -1): Promise<void> => {
@@ -225,8 +152,6 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
   // Sellos que faltan para completar la tarjeta en curso.
   const stampsToGo = card ? Math.max(0, stampsGoal - card.completedStamps) : 0;
 
-  const listboxId = 'admin-loyalty-name-listbox';
-
   return (
     <section aria-labelledby="admin-loyalty-title">
       <header>
@@ -244,98 +169,37 @@ export function LoyaltyPanel({ stampsGoal }: LoyaltyPanelProps) {
 
       <form onSubmit={search} className="card mt-7 p-5 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
-          <div ref={nameFieldRef}>
-            <Field
-              label="Nombre del cliente"
-              htmlFor="admin-loyalty-name"
-              hint="Escribí y elegí un cliente de la lista para traer su tarjeta."
-            >
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted">
-                  <SearchIcon className="h-4 w-4" />
-                </span>
-                <input
-                  id="admin-loyalty-name"
-                  type="text"
-                  role="combobox"
-                  autoComplete="off"
-                  aria-expanded={suggestOpen}
-                  aria-controls={listboxId}
-                  aria-autocomplete="list"
-                  aria-activedescendant={
-                    activeIndex >= 0
-                      ? `admin-loyalty-opt-${activeIndex}`
-                      : undefined
-                  }
-                  placeholder="Ej. Juan Pérez"
-                  className="!pl-9"
-                  value={nameQuery}
-                  onChange={(event) => setNameQuery(event.target.value)}
-                  onFocus={() => {
-                    if (suggestions.length > 0) setSuggestOpen(true);
-                  }}
-                  onKeyDown={handleNameKeyDown}
-                />
+          <CustomerCombobox
+            id="admin-loyalty-name"
+            label="Nombre del cliente"
+            hint="Escribí y elegí un cliente de la lista para traer su tarjeta."
+            placeholder="Ej. Juan Pérez"
+            by="name"
+            minChars={2}
+            value={nameQuery}
+            onChange={setNameQuery}
+            toInputText={(hit) => hit.name}
+            primaryText={(hit) => hit.name}
+            secondaryText={(hit) => formatCustomerPhone(hit.phone)}
+            onSelect={pickCustomer}
+          />
 
-                {suggestOpen && (
-                  <ul
-                    id={listboxId}
-                    role="listbox"
-                    className="absolute left-0 right-0 top-[calc(100%+0.4rem)] z-20 max-h-64 overflow-auto rounded-xl border border-gray-100 bg-white py-1 shadow-card"
-                  >
-                    {suggestLoading && suggestions.length === 0 && (
-                      <li className="px-3 py-2 text-sm text-ink-muted">
-                        Buscando…
-                      </li>
-                    )}
-                    {!suggestLoading && suggestions.length === 0 && (
-                      <li className="px-3 py-2 text-sm text-ink-muted">
-                        Sin coincidencias
-                      </li>
-                    )}
-                    {suggestions.map((hit, index) => (
-                      <li key={`${hit.phone}-${index}`} role="none">
-                        <button
-                          type="button"
-                          id={`admin-loyalty-opt-${index}`}
-                          role="option"
-                          aria-selected={index === activeIndex}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onMouseEnter={() => setActiveIndex(index)}
-                          onClick={() => selectSuggestion(hit)}
-                          className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors ${
-                            index === activeIndex ? 'bg-brand-50' : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="text-sm font-semibold text-ink">
-                            {hit.name}
-                          </span>
-                          <span className="text-xs text-ink-muted">
-                            {formatCustomerPhone(hit.phone)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </Field>
-          </div>
-
-          <Field
+          <CustomerCombobox
+            id="admin-loyalty-phone"
             label="Teléfono del cliente"
-            htmlFor="admin-loyalty-phone"
-            hint="O pegá el número tal cual lo copiaste del listado de turnos."
-          >
-            <input
-              id="admin-loyalty-phone"
-              type="tel"
-              inputMode="tel"
-              placeholder="+541133691609"
-              value={phoneInput}
-              onChange={(event) => setPhoneInput(event.target.value)}
-            />
-          </Field>
+            hint="Escribí el número o pegalo del listado de turnos y elegí el cliente."
+            placeholder="+541133691609"
+            by="phone"
+            minChars={4}
+            type="tel"
+            inputMode="tel"
+            value={phoneInput}
+            onChange={setPhoneInput}
+            toInputText={(hit) => formatCustomerPhone(hit.phone)}
+            primaryText={(hit) => formatCustomerPhone(hit.phone)}
+            secondaryText={(hit) => hit.name}
+            onSelect={pickCustomer}
+          />
         </div>
 
         <div className="mt-4 flex justify-end">

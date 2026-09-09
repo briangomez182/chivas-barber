@@ -14,7 +14,6 @@ import { BarbersPanel } from './BarbersPanel';
 import { ConfiguracionesPanel } from './ConfiguracionesPanel';
 import { LoyaltyPanel } from './LoyaltyPanel';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
-import { ServicesPanel } from './ServicesPanel';
 import { UsersPanel } from './UsersPanel';
 
 interface AdminDashboardProps {
@@ -27,7 +26,6 @@ interface AdminDashboardProps {
 type TabId =
   | 'turnos'
   | 'barberos'
-  | 'servicios'
   | 'lealtad'
   | 'agenda'
   | 'usuarios'
@@ -36,7 +34,6 @@ type TabId =
 const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
   { id: 'barberos', label: 'Barberos' },
-  { id: 'servicios', label: 'Servicios' },
   { id: 'lealtad', label: 'Lealtad' },
   { id: 'agenda', label: 'Agenda' },
   { id: 'usuarios', label: 'Usuarios' },
@@ -53,7 +50,9 @@ export function AdminDashboard({
 
   const [tab, setTab] = useState<TabId>('turnos');
   const [barbers, setBarbers] = useState<Barber[]>(initialBarbers);
-  const [services, setServices] = useState<Service[]>(initialServices);
+  // Sólo para mostrar el nombre del servicio y calcular deudas en la grilla de
+  // turnos. La carta se administra por barbero (pestaña Barberos › Servicios).
+  const [services] = useState<Service[]>(initialServices);
   const [settings, setSettings] = useState<Settings>(initialSettings);
 
   const visibleTabs = settings.loyaltyEnabled
@@ -145,9 +144,6 @@ export function AdminDashboard({
             )}
             {tab === 'barberos' && (
               <BarbersPanel barbers={barbers} onChange={setBarbers} />
-            )}
-            {tab === 'servicios' && (
-              <ServicesPanel services={services} onChange={setServices} />
             )}
             {tab === 'lealtad' && (
               <LoyaltyPanel stampsGoal={settings.loyaltyStampsGoal} />

@@ -65,11 +65,11 @@ interface BarberRow {
 
 interface ServiceRow {
   id: string;
+  barber_id: string;
   name: string;
   description: string;
   duration_min: number;
   price: number;
-  featured: boolean;
   created_at: string;
 }
 
@@ -199,11 +199,11 @@ function toBarber(row: BarberRow): Barber {
 function toService(row: ServiceRow): Service {
   return {
     id: row.id,
+    barberId: row.barber_id,
     name: row.name,
     description: row.description,
     durationMin: row.duration_min,
     price: row.price,
-    featured: row.featured,
     createdAt: row.created_at,
   };
 }
@@ -604,14 +604,23 @@ export async function deleteBarber(id: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 const SERVICE_COLUMNS =
-  'id, name, description, duration_min, price, featured, created_at';
+  'id, barber_id, name, description, duration_min, price, created_at';
 
-export async function listServices(): Promise<Service[]> {
-  const { data, error } = await supabaseAdmin()
+/**
+ * Lista servicios. Sin argumento devuelve la carta de todos los barberos
+ * (la home y el panel de admin la agrupan por barbero); con `barberId`
+ * devuelve sólo los de ese barbero.
+ */
+export async function listServices(barberId?: string): Promise<Service[]> {
+  let query = supabaseAdmin()
     .from('services')
     .select(SERVICE_COLUMNS)
-    .order('created_at', { ascending: true })
-    .returns<ServiceRow[]>();
+    .order('barber_id', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (barberId) query = query.eq('barber_id', barberId);
+
+  const { data, error } = await query.returns<ServiceRow[]>();
 
   if (error) fail('listar servicios', error);
   return (data ?? []).map(toService);
@@ -632,22 +641,22 @@ export async function getService(id: string): Promise<Service | null> {
 }
 
 export interface ServiceInput {
+  barberId: string;
   name: string;
   description: string;
   durationMin: number;
   price: number;
-  featured: boolean;
 }
 
 export async function createService(input: ServiceInput): Promise<Service> {
   const { data, error } = await supabaseAdmin()
     .from('services')
     .insert({
+      barber_id: input.barberId,
       name: input.name,
       description: input.description,
       duration_min: input.durationMin,
       price: input.price,
-      featured: input.featured,
     })
     .select(SERVICE_COLUMNS)
     .single<ServiceRow>();
@@ -665,7 +674,6 @@ export async function updateService(
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.durationMin !== undefined) row.duration_min = patch.durationMin;
   if (patch.price !== undefined) row.price = patch.price;
-  if (patch.featured !== undefined) row.featured = patch.featured;
 
   if (Object.keys(row).length === 0) return getService(id);
 
@@ -1601,6 +1609,57 @@ export async function searchCustomersByName(
     const raw = (row.customer_phone ?? '').replace(/\D/g, '');
     if (!raw) continue;
     const phone = customerPhoneDigits(raw);
+    if (seen.has(phone)) continue;
+    seen.add(phone);
+    hits.push({ name: row.customer_name, phone });
+    if (hits.length >= limit) break;
+  }
+  return hits;
+}
+
+/**
+ * Igual que `searchCustomersByName` pero por teléfono: el admin escribe (o
+ * pega) parte del número y ve los clientes cuyo teléfono contiene esos
+ * dígitos, deduplicados por número normalizado y ordenados por turno más
+ * reciente.
+ *
+ * Un mismo cliente puede tener el número guardado con o sin el prefijo de
+ * país `54` (alta manual vs. reserva web), así que se busca `ilike` contra
+ * las dos formas y después se confirma la coincidencia sobre los dígitos ya
+ * normalizados (la columna puede traer espacios o `+`).
+ */
+export async function searchCustomersByPhone(
+  query: string,
+  limit = 8,
+): Promise<CustomerHit[]> {
+  const term = query.replace(/\D/g, '');
+  if (term.length < 3) return [];
+
+  const local = term.startsWith('54') ? term.slice(2) : term;
+  const needles = Array.from(new Set([term, local, `54${local}`]));
+  const orFilter = needles
+    .map((needle) => `customer_phone.ilike.*${needle}*`)
+    .join(',');
+
+  const { data, error } = await supabaseAdmin()
+    .from('appointments')
+    .select('customer_name, customer_phone, created_at')
+    .or(orFilter)
+    .order('created_at', { ascending: false })
+    .limit(300)
+    .returns<
+      { customer_name: string; customer_phone: string; created_at: string }[]
+    >();
+
+  if (error) fail('buscar clientes por teléfono', error);
+
+  const seen = new Set<string>();
+  const hits: CustomerHit[] = [];
+  for (const row of data ?? []) {
+    const raw = (row.customer_phone ?? '').replace(/\D/g, '');
+    if (!raw) continue;
+    const phone = customerPhoneDigits(raw);
+    if (!phone.includes(local)) continue;
     if (seen.has(phone)) continue;
     seen.add(phone);
     hits.push({ name: row.customer_name, phone });

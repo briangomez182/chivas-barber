@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const date = todayIso();
   const settings = await getSettings();
-  const services = await listServices();
+  const services = await listServices(barberId);
   const service = services[0] ?? null;
   const durationMin = service?.durationMin ?? settings.slotIntervalMin;
 

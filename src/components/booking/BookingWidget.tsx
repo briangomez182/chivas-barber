@@ -61,9 +61,16 @@ export function BookingWidget({
   // campo que falta al confirmar, o hacia la sección de barbero al elegir fecha.
   const MOBILE_SCROLL_BREAKPOINT = 750;
 
+  // Cada barbero tiene su propia carta: sólo se ofrecen los servicios del
+  // barbero elegido.
+  const servicesForBarber = useMemo<Service[]>(
+    () => services.filter((item) => item.barberId === selectedBarberId),
+    [services, selectedBarberId],
+  );
+
   const selectedService = useMemo<Service | undefined>(
-    () => services.find((item) => item.id === serviceId),
-    [services, serviceId],
+    () => servicesForBarber.find((item) => item.id === serviceId),
+    [servicesForBarber, serviceId],
   );
 
   const selectedBarber = useMemo<Barber | undefined>(
@@ -101,6 +108,13 @@ export function BookingWidget({
     setTime(null);
   }, [date, selectedBarberId, durationMin]);
 
+  // El servicio elegido pertenece a un barbero: al cambiar de barbero se
+  // limpia y la duración vuelve al bloque por defecto.
+  useEffect(() => {
+    setServiceId('');
+    setDurationMin(settings.slotIntervalMin);
+  }, [selectedBarberId, settings.slotIntervalMin]);
+
   const handleDateChange = (nextDate: string): void => {
     setDate(nextDate);
 
@@ -136,7 +150,7 @@ export function BookingWidget({
 
   const handleServiceChange = (nextId: string): void => {
     setServiceId(nextId);
-    const service = services.find((item) => item.id === nextId);
+    const service = servicesForBarber.find((item) => item.id === nextId);
     if (service) setDurationMin(service.durationMin);
 
     // Mismo criterio que al elegir fecha o barbero: en pantallas angostas
@@ -180,6 +194,12 @@ export function BookingWidget({
   } | null => {
     if (!selectedBarberId) {
       return { ref: barberSectionRef, message: 'Elegí un barbero' };
+    }
+    if (servicesForBarber.length === 0) {
+      return {
+        ref: serviceRef,
+        message: 'Este barbero todavía no tiene servicios disponibles',
+      };
     }
     if (!serviceId) {
       return { ref: serviceRef, message: 'Elegí un servicio' };
@@ -373,12 +393,17 @@ export function BookingWidget({
                 aria-required="true"
                 value={serviceId}
                 onChange={(event) => handleServiceChange(event.target.value)}
+                disabled={!selectedBarberId || servicesForBarber.length === 0}
                 className="mt-3"
               >
                 <option value="" disabled>
-                  Elegí un servicio…
+                  {!selectedBarberId
+                    ? 'Elegí primero un barbero…'
+                    : servicesForBarber.length === 0
+                      ? 'Este barbero todavía no cargó servicios'
+                      : 'Elegí un servicio…'}
                 </option>
-                {services.map((service) => (
+                {servicesForBarber.map((service) => (
                   <option key={service.id} value={service.id}>
                     {service.name} — {formatDuration(service.durationMin)} —{' '}
                     {formatPrice(service.price)}

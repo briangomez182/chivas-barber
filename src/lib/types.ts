@@ -53,13 +53,14 @@ export interface Barber {
 
 export interface Service {
   id: string;
+  /** Barbero dueño de este servicio: la carta es propia de cada barbero. */
+  barberId: string;
   name: string;
   description: string;
   /** Duración en minutos. */
   durationMin: number;
   /** Precio en pesos argentinos. */
   price: number;
-  featured: boolean;
   createdAt: string;
 }
 

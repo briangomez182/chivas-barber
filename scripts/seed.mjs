@@ -63,6 +63,8 @@ const DEMO = {
     workingDays: [1, 2, 3, 4, 5, 6],
     bufferMin: 0,
   },
+  // Cada barbero trae su propia carta de servicios (nombre, descripción y
+  // precio pueden variar entre barberos).
   barbers: [
     {
       name: 'John',
@@ -70,6 +72,11 @@ const DEMO = {
       specialty: 'Fades y diseños',
       photoUrl: 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?auto=format&fit=crop&w=480&q=80',
       active: true,
+      services: [
+        { name: 'Fade premium', description: 'Degradado a piel, perfilado y diseño de líneas.', durationMin: 60, price: 17000 },
+        { name: 'Corte clásico', description: 'Lavado, corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 13000 },
+        { name: 'Corte + barba', description: 'El combo completo del club. Corte, barba y ritual final.', durationMin: 60, price: 21000 },
+      ],
     },
     {
       name: 'Alex',
@@ -77,6 +84,11 @@ const DEMO = {
       specialty: 'Barba y afeitado clásico',
       photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=480&q=80',
       active: true,
+      services: [
+        { name: 'Barba & afeitado', description: 'Toalla caliente, navaja, aceites y bálsamo.', durationMin: 30, price: 9500 },
+        { name: 'Corte clásico', description: 'Corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 12000 },
+        { name: 'Perfilado express', description: 'Retoque de contornos, patillas y nuca.', durationMin: 15, price: 5000 },
+      ],
     },
     {
       name: 'Mateo',
@@ -84,14 +96,12 @@ const DEMO = {
       specialty: 'Color y texturas',
       photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=480&q=80',
       active: true,
+      services: [
+        { name: 'Color + corte', description: 'Coloración completa, corte y acabado.', durationMin: 90, price: 28000 },
+        { name: 'Mechas / platinado', description: 'Decoloración, matizado y tratamiento.', durationMin: 120, price: 35000 },
+        { name: 'Corte clásico', description: 'Corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 12500 },
+      ],
     },
-  ],
-  services: [
-    { name: 'Corte clásico', description: 'Lavado, corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 12000, featured: true },
-    { name: 'Fade premium', description: 'Degradado a piel, perfilado y diseño de líneas.', durationMin: 60, price: 16000, featured: true },
-    { name: 'Barba & afeitado', description: 'Toalla caliente, navaja, aceites y bálsamo.', durationMin: 30, price: 9000, featured: false },
-    { name: 'Corte + Barba', description: 'El combo completo del club. Corte, barba y ritual final.', durationMin: 60, price: 19000, featured: true },
-    { name: 'Perfilado express', description: 'Retoque de contornos, patillas y nuca.', durationMin: 15, price: 5000, featured: false },
   ],
   appointments: [],
 };
@@ -153,20 +163,46 @@ async function main() {
       ...(b.createdAt ? { created_at: b.createdAt } : {}),
     }));
 
+    let insertedBarbers = [];
     if (barbers.length > 0) {
-      check('barbers', (await db.from('barbers').insert(barbers)).error);
+      const { data, error } = await db.from('barbers').insert(barbers).select('id, name');
+      check('barbers', error);
+      insertedBarbers = data ?? [];
     }
-    console.log(`✓ barbers (${barbers.length})`);
+    console.log(`✓ barbers (${insertedBarbers.length})`);
 
-    const services = (source.services ?? []).map((x) => ({
-      ...(x.id ? { id: x.id } : {}),
-      name: x.name,
-      description: x.description ?? '',
-      duration_min: x.durationMin,
-      price: x.price,
-      featured: x.featured ?? false,
-      ...(x.createdAt ? { created_at: x.createdAt } : {}),
-    }));
+    // Servicios: la carta es propia de cada barbero (`services.barber_id`).
+    const barberIdByName = new Map(insertedBarbers.map((b) => [b.name, b.id]));
+    let services = [];
+
+    if (legacy) {
+      // El store viejo tenía un catálogo global sin barbero: se asigna todo
+      // al primer barbero para no perder los datos. Después se reparte a mano.
+      const fallbackId = insertedBarbers[0]?.id;
+      if (fallbackId) {
+        services = (source.services ?? []).map((x) => ({
+          ...(x.id ? { id: x.id } : {}),
+          barber_id: x.barberId ?? fallbackId,
+          name: x.name,
+          description: x.description ?? '',
+          duration_min: x.durationMin,
+          price: x.price,
+          ...(x.createdAt ? { created_at: x.createdAt } : {}),
+        }));
+      }
+    } else {
+      services = (source.barbers ?? []).flatMap((b) => {
+        const barberId = barberIdByName.get(b.name);
+        if (!barberId) return [];
+        return (b.services ?? []).map((x) => ({
+          barber_id: barberId,
+          name: x.name,
+          description: x.description ?? '',
+          duration_min: x.durationMin,
+          price: x.price,
+        }));
+      });
+    }
 
     if (services.length > 0) {
       check('services', (await db.from('services').insert(services)).error);

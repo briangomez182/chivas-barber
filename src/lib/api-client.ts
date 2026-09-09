@@ -109,7 +109,12 @@ export const api = {
     },
   },
   services: {
-    list: () => apiFetch<{ services: Service[] }>('/api/services'),
+    list: (barberId?: string) =>
+      apiFetch<{ services: Service[] }>(
+        barberId
+          ? `/api/services?barberId=${encodeURIComponent(barberId)}`
+          : '/api/services',
+      ),
     create: (data: Partial<Service>) =>
       apiFetch<{ service: Service }>('/api/services', {
         method: 'POST',
@@ -255,10 +260,10 @@ export const api = {
       }),
   },
   customers: {
-    /** Autocompletado de clientes por nombre (sólo admin). */
-    search: (q: string) =>
+    /** Autocompletado de clientes por nombre o teléfono (sólo admin). */
+    search: (q: string, by: 'name' | 'phone' = 'name') =>
       apiFetch<{ customers: { name: string; phone: string }[] }>(
-        `/api/customers/search?q=${encodeURIComponent(q)}`,
+        `/api/customers/search?q=${encodeURIComponent(q)}&by=${by}`,
       ),
   },
   loyalty: {

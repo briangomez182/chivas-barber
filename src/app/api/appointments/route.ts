@@ -125,7 +125,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const service = body.serviceId ? await getService(body.serviceId) : null;
+  // Sólo vale un servicio de la carta del propio barbero.
+  const requested = body.serviceId ? await getService(body.serviceId) : null;
+  const service = requested && requested.barberId === barberId ? requested : null;
 
   const durationMin = service
     ? service.durationMin

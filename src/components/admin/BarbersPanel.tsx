@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
+import { BarberServicesPanel } from '@/components/admin/BarberServicesPanel';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -37,8 +38,16 @@ const EMPTY_DRAFT: DraftBarber = {
 
 const ALLOWED_PHOTO_TYPES = new Set(['image/png', 'image/jpeg']);
 
-/** Acordeón expandible con la gestión de portafolio de un barbero. */
-function PortfolioAccordion({ barber }: { barber: Barber }) {
+/** Acordeón expandible dentro de la tarjeta de un barbero. */
+function CardAccordion({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState<boolean>(false);
 
   return (
@@ -50,12 +59,8 @@ function PortfolioAccordion({ barber }: { barber: Barber }) {
         aria-expanded={open}
       >
         <span className="flex items-center gap-1.5">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-          Portafolio de fotos
+          {icon}
+          {label}
         </span>
         <motion.svg
           animate={{ rotate: open ? 180 : 0 }}
@@ -81,13 +86,29 @@ function PortfolioAccordion({ barber }: { barber: Barber }) {
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             style={{ overflow: 'hidden' }}
           >
-            <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
+            {children}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 }
+
+const PORTFOLIO_ICON = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+
+const SERVICES_ICON = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="7" x2="20" y2="7" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="17" x2="14" y2="17" />
+  </svg>
+);
 
 export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
   const [draft, setDraft] = useState<DraftBarber | null>(null);
@@ -279,8 +300,13 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
               </button>
             </div>
 
-            {/* Portafolio expandible */}
-            <PortfolioAccordion barber={barber} />
+            {/* Servicios y portafolio expandibles */}
+            <CardAccordion label="Servicios" icon={SERVICES_ICON}>
+              <BarberServicesPanel barberId={barber.id} barberName={barber.name} />
+            </CardAccordion>
+            <CardAccordion label="Portafolio de fotos" icon={PORTFOLIO_ICON}>
+              <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
+            </CardAccordion>
           </div>
           </motion.li>
         ))}

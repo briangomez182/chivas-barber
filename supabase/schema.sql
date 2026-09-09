@@ -41,17 +41,20 @@ create table if not exists public.barbers (
 create index if not exists barbers_active_idx on public.barbers (active);
 
 -- ---------------------------------------------------------------------------
--- services
+-- services — carta propia de cada barbero (nombre, descripción y precio
+-- pueden variar entre barberos). Ver supabase/migrations/0017_services_per_barber.sql.
 -- ---------------------------------------------------------------------------
 create table if not exists public.services (
   id           uuid primary key default gen_random_uuid(),
+  barber_id    uuid not null references public.barbers (id) on delete cascade,
   name         text not null check (length(btrim(name)) >= 2),
   description  text not null default '',
   duration_min integer not null check (duration_min >= 5),
   price        integer not null check (price >= 0),
-  featured     boolean not null default false,
   created_at   timestamptz not null default now()
 );
+
+create index if not exists services_barber_idx on public.services (barber_id);
 
 -- ---------------------------------------------------------------------------
 -- appointments

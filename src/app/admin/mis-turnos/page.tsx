@@ -21,7 +21,7 @@ export default async function MisTurnosPage() {
 
   const [barber, services, settings] = await Promise.all([
     getBarber(session.barberId),
-    listServices(),
+    listServices(session.barberId),
     getSettings(),
   ]);
 

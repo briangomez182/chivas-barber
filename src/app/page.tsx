@@ -33,7 +33,7 @@ export default async function HomePage() {
 
       <main>
         <Hero />
-        <ServicesSection services={services} />
+        <ServicesSection barbers={barbers} services={services} />
         <BookingExperience
           barbers={barbersWithPortfolio}
           services={services}
