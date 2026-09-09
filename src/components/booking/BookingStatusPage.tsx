@@ -47,8 +47,10 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
   const appointmentId = searchParams.get('external_reference');
 
   const [appointment, setAppointment] = useState<TrackedAppointment | null>(null);
-  // Switch "Cobrar seña online" del admin: si está activo, esta pantalla
-  // esconde el "Volver al inicio" y deja sólo el botón de WhatsApp.
+  // Switch "Cobrar seña online" del admin: si está activo (el turno se pagó
+  // por Mercado Pago), esta pantalla reemplaza el botón "Volver al inicio"
+  // por una "X" chica arriba a la derecha y pinta el botón de WhatsApp de
+  // verde, para empujar al cliente a mandar el mensaje.
   const [depositEnabled, setDepositEnabled] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [notFound, setNotFound] = useState<boolean>(false);
@@ -137,8 +139,20 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl"
+        className="relative w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl"
       >
+        {depositEnabled && (
+          <Link
+            href="/"
+            aria-label="Volver al inicio"
+            className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-muted transition-colors hover:bg-gray-100 hover:text-ink"
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current" aria-hidden="true">
+              <path d="M10 8.6 6.7 5.3 5.3 6.7 8.6 10l-3.3 3.3 1.4 1.4L10 11.4l3.3 3.3 1.4-1.4L11.4 10l3.3-3.3-1.4-1.4L10 8.6Z" />
+            </svg>
+          </Link>
+        )}
+
         <span
           aria-hidden="true"
           className={`mx-auto grid h-14 w-14 place-items-center rounded-full text-white ${
@@ -207,7 +221,11 @@ export function BookingStatusPage({ kind }: BookingStatusPageProps) {
             )}
             target="_blank"
             rel="noreferrer noopener"
-            className="pill-outline flex-1"
+            className={
+              depositEnabled
+                ? 'pill flex-1 bg-[#25D366] text-white hover:bg-[#1EBE57] active:scale-[0.98]'
+                : 'pill-outline flex-1'
+            }
           >
             Escribir por WhatsApp
           </a>
