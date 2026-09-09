@@ -10,6 +10,7 @@ import {
   listServices,
 } from '@/lib/db';
 import { getSession } from '@/lib/guard';
+import { notifyNewAppointment } from '@/lib/push';
 import { buildSlots } from '@/lib/slots';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
@@ -111,6 +112,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Mismo aviso push que un turno real (best-effort). Sirve además para
+  // probar las notificaciones desde el panel sin hacer una reserva de verdad.
+  try {
+    await notifyNewAppointment({ ...result.appointment, amount });
+  } catch (cause) {
+    console.error('[chivas] No se pudo enviar la notificación push del turno de prueba', cause);
   }
 
   return NextResponse.json({
