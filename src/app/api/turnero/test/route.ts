@@ -59,14 +59,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   const settings = await getSettings();
   const services = await listServices(barberId);
   const service = services[0] ?? null;
-  const durationMin = service?.durationMin ?? settings.slotIntervalMin;
+  const durationMin = service?.durationMin ?? barber.slotIntervalMin;
 
   const [appointments, blocks] = await Promise.all([
     listAppointments({ date, barberId }),
     listScheduleBlocks({ date, barberId }),
   ]);
 
-  const slots = buildSlots({ date, durationMin, settings, appointments, blocks });
+  const slots = buildSlots({ date, durationMin, schedule: barber, appointments, blocks });
   const nowMin = nowMinutes();
   const freeSlot =
     slots.find((slot) => slot.available && timeToMinutes(slot.time) >= nowMin) ??

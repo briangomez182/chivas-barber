@@ -87,7 +87,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ? service.durationMin
     : Number.isFinite(Number(body.durationMin)) && Number(body.durationMin) > 0
       ? Math.round(Number(body.durationMin))
-      : settings.slotIntervalMin;
+      : barber.slotIntervalMin;
 
   const result = await bookAppointment({
     barberId,

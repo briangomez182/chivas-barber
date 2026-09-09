@@ -26,16 +26,22 @@ create table if not exists public.settings (
 insert into public.settings (id) values (true) on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- barbers
+-- barbers — cada barbero tiene su propia agenda (apertura/cierre, días,
+-- intervalo entre bloques y descanso). Ver supabase/migrations/0018_barber_schedule.sql.
 -- ---------------------------------------------------------------------------
 create table if not exists public.barbers (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null check (length(btrim(name)) >= 2),
-  role       text not null default 'Barber',
-  specialty  text not null default '',
-  photo_url  text not null default '',
-  active     boolean not null default true,
-  created_at timestamptz not null default now()
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null check (length(btrim(name)) >= 2),
+  role              text not null default 'Barber',
+  specialty         text not null default '',
+  photo_url         text not null default '',
+  active            boolean not null default true,
+  opening_time      text not null default '10:00' check (opening_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  closing_time      text not null default '20:00' check (closing_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  working_days      integer[] not null default '{1,2,3,4,5,6}',
+  slot_interval_min integer not null default 30 check (slot_interval_min in (15, 30, 45, 60)),
+  buffer_min        integer not null default 0 check (buffer_min >= 0),
+  created_at        timestamptz not null default now()
 );
 
 create index if not exists barbers_active_idx on public.barbers (active);

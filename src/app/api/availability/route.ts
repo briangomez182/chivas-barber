@@ -10,8 +10,10 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * GET /api/availability?barberId=…&date=YYYY-MM-DD&duration=45
  *
- * Devuelve los bloques del día ya cruzados con los turnos existentes.
- * Si no se envía `duration`, se usa el intervalo global de la agenda.
+ * Devuelve los bloques del día ya cruzados con los turnos existentes. La
+ * agenda (apertura/cierre, días, intervalo, descanso) es la del barbero; sin
+ * `barberId` se usa la global por defecto. Si no se envía `duration`, se usa
+ * el intervalo de esa agenda.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
@@ -26,15 +28,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (barberId && !(await getBarber(barberId))) {
+  const barber = barberId ? await getBarber(barberId) : null;
+  if (barberId && !barber) {
     return NextResponse.json({ error: 'Barbero no encontrado' }, { status: 404 });
   }
 
-  const settings = await getSettings();
+  const schedule = barber ?? (await getSettings());
 
   const durationMin = Number.isFinite(durationParam) && durationParam > 0
     ? Math.round(durationParam)
-    : settings.slotIntervalMin;
+    : schedule.slotIntervalMin;
 
   const appointments = await listAppointments({
     date,
@@ -48,7 +51,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const slots = buildSlots({
     date,
     durationMin,
-    settings,
+    schedule,
     appointments,
     blocks,
   });

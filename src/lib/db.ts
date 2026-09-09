@@ -60,6 +60,11 @@ interface BarberRow {
   specialty: string;
   photo_url: string;
   active: boolean;
+  opening_time: string;
+  closing_time: string;
+  working_days: number[];
+  slot_interval_min: number;
+  buffer_min: number;
   created_at: string;
 }
 
@@ -192,6 +197,13 @@ function toBarber(row: BarberRow): Barber {
     specialty: row.specialty,
     photoUrl: row.photo_url,
     active: row.active,
+    openingTime: row.opening_time,
+    closingTime: row.closing_time,
+    workingDays: row.working_days,
+    slotIntervalMin: isSlotInterval(row.slot_interval_min)
+      ? row.slot_interval_min
+      : 30,
+    bufferMin: row.buffer_min,
     createdAt: row.created_at,
   };
 }
@@ -344,7 +356,7 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
 // ---------------------------------------------------------------------------
 
 const BARBER_COLUMNS =
-  'id, name, role, specialty, photo_url, active, created_at';
+  'id, name, role, specialty, photo_url, active, opening_time, closing_time, working_days, slot_interval_min, buffer_min, created_at';
 
 export async function listBarbers(includeInactive = false): Promise<Barber[]> {
   let query = supabaseAdmin()
@@ -380,6 +392,31 @@ export interface BarberInput {
   specialty: string;
   photoUrl: string;
   active: boolean;
+  /**
+   * Agenda del barbero. Opcionales: al crear se dejan que apliquen los
+   * defaults de la tabla (10:00–20:00, Lun–Sáb, 30 min, 0 de descanso) y el
+   * admin los ajusta después desde Barberos › Agenda y horarios.
+   */
+  openingTime?: string;
+  closingTime?: string;
+  workingDays?: number[];
+  slotIntervalMin?: SlotInterval;
+  bufferMin?: number;
+}
+
+/** Traduce los campos de agenda de `BarberInput` a columnas snake_case. */
+function scheduleColumns(
+  patch: Partial<BarberInput>,
+): Partial<BarberRow> {
+  const row: Partial<BarberRow> = {};
+  if (patch.openingTime !== undefined) row.opening_time = patch.openingTime;
+  if (patch.closingTime !== undefined) row.closing_time = patch.closingTime;
+  if (patch.workingDays !== undefined) row.working_days = patch.workingDays;
+  if (patch.slotIntervalMin !== undefined) {
+    row.slot_interval_min = patch.slotIntervalMin;
+  }
+  if (patch.bufferMin !== undefined) row.buffer_min = patch.bufferMin;
+  return row;
 }
 
 export async function createBarber(input: BarberInput): Promise<Barber> {
@@ -391,6 +428,7 @@ export async function createBarber(input: BarberInput): Promise<Barber> {
       specialty: input.specialty,
       photo_url: input.photoUrl,
       active: input.active,
+      ...scheduleColumns(input),
     })
     .select(BARBER_COLUMNS)
     .single<BarberRow>();
@@ -403,7 +441,7 @@ export async function updateBarber(
   id: string,
   patch: Partial<BarberInput>,
 ): Promise<Barber | null> {
-  const row: Partial<BarberRow> = {};
+  const row: Partial<BarberRow> = { ...scheduleColumns(patch) };
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.role !== undefined) row.role = patch.role;
   if (patch.specialty !== undefined) row.specialty = patch.specialty;

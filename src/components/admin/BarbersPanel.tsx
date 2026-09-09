@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
+import { BarberScheduleForm } from '@/components/admin/BarberScheduleForm';
 import { BarberServicesPanel } from '@/components/admin/BarberServicesPanel';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
@@ -107,6 +108,13 @@ const SERVICES_ICON = (
     <line x1="4" y1="7" x2="20" y2="7" />
     <line x1="4" y1="12" x2="20" y2="12" />
     <line x1="4" y1="17" x2="14" y2="17" />
+  </svg>
+);
+
+const SCHEDULE_ICON = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <polyline points="12 7 12 12 16 14" />
   </svg>
 );
 
@@ -300,9 +308,19 @@ export function BarbersPanel({ barbers, onChange }: BarbersPanelProps) {
               </button>
             </div>
 
-            {/* Servicios y portafolio expandibles */}
+            {/* Servicios, agenda y portafolio expandibles */}
             <CardAccordion label="Servicios" icon={SERVICES_ICON}>
               <BarberServicesPanel barberId={barber.id} barberName={barber.name} />
+            </CardAccordion>
+            <CardAccordion label="Agenda y horarios" icon={SCHEDULE_ICON}>
+              <BarberScheduleForm
+                barber={barber}
+                onSaved={(updated) =>
+                  onChange(
+                    barbers.map((item) => (item.id === updated.id ? updated : item)),
+                  )
+                }
+              />
             </CardAccordion>
             <CardAccordion label="Portafolio de fotos" icon={PORTFOLIO_ICON}>
               <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />

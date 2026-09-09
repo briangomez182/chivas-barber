@@ -13,7 +13,6 @@ import { AppointmentsPanel } from './AppointmentsPanel';
 import { BarbersPanel } from './BarbersPanel';
 import { ConfiguracionesPanel } from './ConfiguracionesPanel';
 import { LoyaltyPanel } from './LoyaltyPanel';
-import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
 import { UsersPanel } from './UsersPanel';
 
 interface AdminDashboardProps {
@@ -27,7 +26,6 @@ type TabId =
   | 'turnos'
   | 'barberos'
   | 'lealtad'
-  | 'agenda'
   | 'usuarios'
   | 'configuraciones';
 
@@ -35,7 +33,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'turnos', label: 'Turnos' },
   { id: 'barberos', label: 'Barberos' },
   { id: 'lealtad', label: 'Lealtad' },
-  { id: 'agenda', label: 'Agenda' },
   { id: 'usuarios', label: 'Usuarios' },
   { id: 'configuraciones', label: 'Configuraciones' },
 ];
@@ -147,9 +144,6 @@ export function AdminDashboard({
             )}
             {tab === 'lealtad' && (
               <LoyaltyPanel stampsGoal={settings.loyaltyStampsGoal} />
-            )}
-            {tab === 'agenda' && (
-              <ScheduleSettingsPanel settings={settings} onChange={setSettings} />
             )}
             {tab === 'usuarios' && <UsersPanel barbers={barbers} />}
             {tab === 'configuraciones' && (

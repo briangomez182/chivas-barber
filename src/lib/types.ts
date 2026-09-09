@@ -47,6 +47,23 @@ export interface Barber {
   photoUrl: string;
   active: boolean;
   createdAt: string;
+  /**
+   * Agenda propia del barbero: cada uno abre/cierra a su hora, trabaja los
+   * días que quiere y genera bloques en su propio intervalo. Reemplaza a la
+   * agenda global (que dejó de tener pantalla en el panel). Valores por
+   * defecto al crear un barbero: 10:00–20:00, Lun–Sáb, bloques de 30 min,
+   * sin descanso.
+   */
+  /** Apertura en formato `HH:mm`. */
+  openingTime: string;
+  /** Cierre en formato `HH:mm`. */
+  closingTime: string;
+  /** Días laborables: 0 = domingo … 6 = sábado. */
+  workingDays: number[];
+  /** Paso entre bloques de horario, en minutos. */
+  slotIntervalMin: SlotInterval;
+  /** Minutos de descanso entre un turno y el siguiente. */
+  bufferMin: number;
   /** Imágenes de portafolio (hasta 5). Se popula sólo cuando se pide explícitamente. */
   portfolioImages?: BarberPortfolioImage[];
 }

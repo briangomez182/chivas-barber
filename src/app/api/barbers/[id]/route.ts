@@ -2,13 +2,75 @@ import { NextResponse } from 'next/server';
 
 import { deleteBarber, updateBarber, type BarberInput } from '@/lib/db';
 import { requireAdmin } from '@/lib/guard';
-import type { Barber } from '@/lib/types';
+import { SLOT_INTERVALS, type Barber, type SlotInterval } from '@/lib/types';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 type BarberPatch = Partial<Omit<Barber, 'id' | 'createdAt'>>;
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function isSlotInterval(value: number): value is SlotInterval {
+  return (SLOT_INTERVALS as readonly number[]).includes(value);
+}
+
+/**
+ * Valida y normaliza los campos de agenda del barbero. Devuelve el patch a
+ * aplicar, o un mensaje de error si algo no cierra.
+ */
+function readSchedulePatch(
+  body: BarberPatch,
+): { patch: Partial<BarberInput> } | { error: string } {
+  const patch: Partial<BarberInput> = {};
+
+  for (const [key, value] of [
+    ['openingTime', body.openingTime],
+    ['closingTime', body.closingTime],
+  ] as const) {
+    if (value === undefined) continue;
+    if (typeof value !== 'string' || !TIME_PATTERN.test(value)) {
+      return { error: 'Horario inválido (se espera HH:mm).' };
+    }
+    patch[key] = value;
+  }
+
+  if (
+    patch.openingTime !== undefined &&
+    patch.closingTime !== undefined &&
+    patch.openingTime >= patch.closingTime
+  ) {
+    return { error: 'La apertura tiene que ser antes del cierre.' };
+  }
+
+  if (body.workingDays !== undefined) {
+    if (
+      !Array.isArray(body.workingDays) ||
+      body.workingDays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)
+    ) {
+      return { error: 'Días laborables inválidos.' };
+    }
+    patch.workingDays = Array.from(new Set(body.workingDays)).sort((a, b) => a - b);
+  }
+
+  if (body.slotIntervalMin !== undefined) {
+    if (!isSlotInterval(Number(body.slotIntervalMin))) {
+      return { error: 'El intervalo debe ser 15, 30, 45 o 60 minutos.' };
+    }
+    patch.slotIntervalMin = Number(body.slotIntervalMin) as SlotInterval;
+  }
+
+  if (body.bufferMin !== undefined) {
+    const value = Number(body.bufferMin);
+    if (!Number.isFinite(value) || value < 0 || value > 120) {
+      return { error: 'El descanso debe estar entre 0 y 120 minutos.' };
+    }
+    patch.bufferMin = Math.round(value);
+  }
+
+  return { patch };
+}
 
 /** PATCH /api/barbers/:id — edición (admin). */
 export async function PATCH(
@@ -34,6 +96,12 @@ export async function PATCH(
     patch.photoUrl = body.photoUrl.trim();
   }
   if (typeof body.active === 'boolean') patch.active = body.active;
+
+  const schedule = readSchedulePatch(body);
+  if ('error' in schedule) {
+    return NextResponse.json({ error: schedule.error }, { status: 400 });
+  }
+  Object.assign(patch, schedule.patch);
 
   const barber = await updateBarber(id, patch);
 

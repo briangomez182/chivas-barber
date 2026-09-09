@@ -5,13 +5,27 @@ import {
   todayIso,
   weekdayOf,
 } from './date';
-import type { Appointment, ScheduleBlock, Settings, Slot } from './types';
+import type { Appointment, ScheduleBlock, Slot } from './types';
+
+/**
+ * Parámetros de agenda usados para generar los bloques de un día. Los cumple
+ * tanto un `Barber` (su agenda propia) como el `Settings` global (que quedó
+ * sólo como valor por defecto para cuando no hay un barbero en contexto).
+ */
+export interface DaySchedule {
+  openingTime: string;
+  closingTime: string;
+  workingDays: number[];
+  slotIntervalMin: number;
+  bufferMin: number;
+}
 
 interface BuildSlotsInput {
   date: string;
   /** Duración del servicio elegido, en minutos. */
   durationMin: number;
-  settings: Settings;
+  /** Agenda del barbero (o la global por defecto). */
+  schedule: DaySchedule;
   /** Turnos ya reservados para ese barbero y fecha. */
   appointments: Appointment[];
   /** Tramos que el barbero (o el admin) marcó como no disponibles. */
@@ -45,7 +59,7 @@ function isBlocking(item: Appointment): boolean {
 /**
  * Genera los bloques horarios de un día.
  *
- * - El paso entre bloques es `settings.slotIntervalMin` (15 / 30 / 45 / 60).
+ * - El paso entre bloques es `schedule.slotIntervalMin` (15 / 30 / 45 / 60).
  * - Un bloque sólo existe si el servicio completo entra antes del cierre.
  * - Se descarta cualquier bloque que se superponga con un turno existente
  *   (incluyendo el `bufferMin` de descanso).
@@ -54,17 +68,17 @@ function isBlocking(item: Appointment): boolean {
 export function buildSlots({
   date,
   durationMin,
-  settings,
+  schedule,
   appointments,
   blocks = [],
 }: BuildSlotsInput): Slot[] {
   const weekday = weekdayOf(date);
-  if (!settings.workingDays.includes(weekday)) return [];
+  if (!schedule.workingDays.includes(weekday)) return [];
 
-  const opening = timeToMinutes(settings.openingTime);
-  const closing = timeToMinutes(settings.closingTime);
-  const step = settings.slotIntervalMin;
-  const buffer = settings.bufferMin;
+  const opening = timeToMinutes(schedule.openingTime);
+  const closing = timeToMinutes(schedule.closingTime);
+  const step = schedule.slotIntervalMin;
+  const buffer = schedule.bufferMin;
 
   const busy: Busy[] = appointments
     .filter((item) => item.date === date && isBlocking(item))

@@ -78,6 +78,12 @@ export function BookingWidget({
     [barbers, selectedBarberId],
   );
 
+  // Cada barbero tiene su propia agenda (horario, días, intervalo). Sin
+  // barbero elegido se usa la global por defecto (`settings`) sólo para el
+  // texto y el calendario iniciales.
+  const schedule = selectedBarber ?? settings;
+  const barberInterval = schedule.slotIntervalMin;
+
   const loadSlots = useCallback(async (): Promise<void> => {
     if (!selectedBarberId) return;
 
@@ -109,11 +115,11 @@ export function BookingWidget({
   }, [date, selectedBarberId, durationMin]);
 
   // El servicio elegido pertenece a un barbero: al cambiar de barbero se
-  // limpia y la duración vuelve al bloque por defecto.
+  // limpia y la duración vuelve al intervalo de la agenda de ese barbero.
   useEffect(() => {
     setServiceId('');
-    setDurationMin(settings.slotIntervalMin);
-  }, [selectedBarberId, settings.slotIntervalMin]);
+    setDurationMin(barberInterval);
+  }, [selectedBarberId, barberInterval]);
 
   const handleDateChange = (nextDate: string): void => {
     setDate(nextDate);
@@ -305,9 +311,10 @@ export function BookingWidget({
             Elegí tu turno
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-            Seleccioná barbero, servicio y horario. Los bloques se generan
-            automáticamente cada {settings.slotIntervalMin} minutos entre las{' '}
-            {settings.openingTime} y las {settings.closingTime}.
+            Seleccioná barbero, servicio y horario.{' '}
+            {selectedBarber
+              ? `${selectedBarber.name} atiende de ${schedule.openingTime} a ${schedule.closingTime}; los bloques arrancan cada ${schedule.slotIntervalMin} minutos.`
+              : 'Cada barbero tiene su propio horario y sus propios bloques.'}
           </p>
         </div>
 
@@ -320,7 +327,7 @@ export function BookingWidget({
             <Calendar
               value={date}
               onChange={handleDateChange}
-              workingDays={settings.workingDays}
+              workingDays={schedule.workingDays}
             />
 
             {settings.depositEnabled && (

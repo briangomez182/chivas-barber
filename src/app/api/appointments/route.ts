@@ -4,7 +4,6 @@ import {
   bookAppointment,
   getBarber,
   getService,
-  getSettings,
   listAppointmentsPage,
 } from '@/lib/db';
 import { getSession, requireStaff } from '@/lib/guard';
@@ -133,7 +132,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ? service.durationMin
     : Number.isFinite(Number(body.durationMin)) && Number(body.durationMin) > 0
       ? Math.round(Number(body.durationMin))
-      : (await getSettings()).slotIntervalMin;
+      : barber.slotIntervalMin;
 
   // El chequeo de solapamiento vive dentro de la transacción de Postgres
   // (ver `book_appointment` en supabase/schema.sql), no acá: si lo hiciéramos

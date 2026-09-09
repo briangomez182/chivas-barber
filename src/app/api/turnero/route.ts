@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { minutesToTime, nowMinutes, timeToMinutes, todayIso } from '@/lib/date';
 import {
   getBarber,
-  getSettings,
   listAppointments,
   listScheduleBlocks,
 } from '@/lib/db';
@@ -46,18 +45,17 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const date = todayIso();
-  const settings = await getSettings();
 
   const [appointments, blocks] = await Promise.all([
     listAppointments({ date, barberId }),
     listScheduleBlocks({ date, barberId }),
   ]);
 
-  const step = settings.slotIntervalMin;
+  const step = barber.slotIntervalMin;
   const slots = buildSlots({
     date,
     durationMin: step,
-    settings,
+    schedule: barber,
     appointments,
     blocks,
   });

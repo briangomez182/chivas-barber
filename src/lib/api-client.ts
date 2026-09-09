@@ -317,5 +317,11 @@ export const api = {
       ),
     logout: () => apiFetch<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
     me: () => apiFetch<{ session: Session | null }>('/api/auth/me'),
+    /** Dispara el mail de recuperación. Respuesta genérica, no revela si el email existe. */
+    forgotPassword: (email: string) =>
+      apiFetch<{ ok: true; message: string }>('/api/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
   },
 };

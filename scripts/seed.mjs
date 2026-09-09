@@ -63,8 +63,9 @@ const DEMO = {
     workingDays: [1, 2, 3, 4, 5, 6],
     bufferMin: 0,
   },
-  // Cada barbero trae su propia carta de servicios (nombre, descripción y
-  // precio pueden variar entre barberos).
+  // Cada barbero trae su propia carta de servicios y su propia agenda
+  // (horario, días e intervalo pueden variar entre barberos). Sin `schedule`
+  // se aplican los defaults de la tabla: 10:00–20:00, Lun–Sáb, 30 min, 0.
   barbers: [
     {
       name: 'John',
@@ -72,6 +73,7 @@ const DEMO = {
       specialty: 'Fades y diseños',
       photoUrl: 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?auto=format&fit=crop&w=480&q=80',
       active: true,
+      schedule: { openingTime: '10:00', closingTime: '19:00', workingDays: [2, 3, 4, 5, 6], slotIntervalMin: 30, bufferMin: 0 },
       services: [
         { name: 'Fade premium', description: 'Degradado a piel, perfilado y diseño de líneas.', durationMin: 60, price: 17000 },
         { name: 'Corte clásico', description: 'Lavado, corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 13000 },
@@ -84,6 +86,7 @@ const DEMO = {
       specialty: 'Barba y afeitado clásico',
       photoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=480&q=80',
       active: true,
+      schedule: { openingTime: '09:00', closingTime: '18:00', workingDays: [1, 2, 3, 4, 5], slotIntervalMin: 15, bufferMin: 5 },
       services: [
         { name: 'Barba & afeitado', description: 'Toalla caliente, navaja, aceites y bálsamo.', durationMin: 30, price: 9500 },
         { name: 'Corte clásico', description: 'Corte a tijera y máquina, peinado y acabado.', durationMin: 45, price: 12000 },
@@ -96,6 +99,7 @@ const DEMO = {
       specialty: 'Color y texturas',
       photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=480&q=80',
       active: true,
+      schedule: { openingTime: '11:00', closingTime: '20:00', workingDays: [3, 4, 5, 6], slotIntervalMin: 60, bufferMin: 10 },
       services: [
         { name: 'Color + corte', description: 'Coloración completa, corte y acabado.', durationMin: 90, price: 28000 },
         { name: 'Mechas / platinado', description: 'Decoloración, matizado y tratamiento.', durationMin: 120, price: 35000 },
@@ -160,6 +164,16 @@ async function main() {
       specialty: b.specialty ?? '',
       photo_url: b.photoUrl ?? '',
       active: b.active ?? true,
+      // Agenda propia del barbero; sin `schedule` aplican los defaults de la tabla.
+      ...(b.schedule
+        ? {
+            opening_time: b.schedule.openingTime,
+            closing_time: b.schedule.closingTime,
+            working_days: b.schedule.workingDays,
+            slot_interval_min: b.schedule.slotIntervalMin,
+            buffer_min: b.schedule.bufferMin,
+          }
+        : {}),
       ...(b.createdAt ? { created_at: b.createdAt } : {}),
     }));
 
