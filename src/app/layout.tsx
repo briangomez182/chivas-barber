@@ -14,6 +14,12 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://chivasbarberiaclub.com'),
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: BRAND.shortName,
+    statusBarStyle: 'black-translucent',
+  },
   title: {
     default: `${BRAND.name} — Barbería en Av. San Juan, CABA`,
     template: `%s · ${BRAND.name}`,

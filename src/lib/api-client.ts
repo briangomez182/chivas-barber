@@ -274,6 +274,36 @@ export const api = {
         body: JSON.stringify({ phone, delta }),
       }),
   },
+  push: {
+    /** Clave pública VAPID + estado del módulo (sólo staff). */
+    config: () =>
+      apiFetch<{
+        configured: boolean;
+        publicKey: string | null;
+        deviceCount: number;
+      }>('/api/push'),
+    /** Registra el PushSubscription de este dispositivo. */
+    subscribe: (subscription: PushSubscriptionJSON) =>
+      apiFetch<{ ok: true }>('/api/push/subscription', {
+        method: 'POST',
+        body: JSON.stringify(subscription),
+      }),
+    /** Baja de este dispositivo por su endpoint. */
+    unsubscribe: (endpoint: string) =>
+      apiFetch<{ ok: true }>('/api/push/subscription', {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint }),
+      }),
+    /** Manda una notificación de prueba a todos los dispositivos suscritos. */
+    test: () =>
+      apiFetch<{
+        total: number;
+        sent: number;
+        failed: number;
+        removed: number;
+        skipped?: 'not_configured';
+      }>('/api/push/test', { method: 'POST' }),
+  },
   auth: {
     login: (email: string, password: string) =>
       apiFetch<{ user: { id: string; name: string; role: string } }>(

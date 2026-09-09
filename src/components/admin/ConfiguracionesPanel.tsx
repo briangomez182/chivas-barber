@@ -7,6 +7,8 @@ import { api } from '@/lib/api-client';
 import { formatPrice } from '@/lib/date';
 import { LOYALTY_STAMPS_GOALS, type LoyaltyStampsGoal, type Settings } from '@/lib/types';
 
+import { PushNotificationsCard } from './PushNotificationsCard';
+
 interface ConfiguracionesPanelProps {
   settings: Settings;
   onChange: (settings: Settings) => void;
@@ -320,6 +322,8 @@ export function ConfiguracionesPanel({ settings, onChange }: ConfiguracionesPane
               </Field>
             )}
           </div>
+
+          <PushNotificationsCard />
         </div>
 
         {message && (

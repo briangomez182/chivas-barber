@@ -1433,6 +1433,120 @@ export async function updateNotification(
 }
 
 // ---------------------------------------------------------------------------
+// Suscripciones a notificaciones push (PWA) — ver supabase/migrations/0016 y
+// lib/push.ts
+// ---------------------------------------------------------------------------
+
+const PUSH_SUBSCRIPTION_COLUMNS =
+  'id, endpoint, p256dh, auth, user_agent, created_at, last_success_at, last_error';
+
+interface PushSubscriptionRow {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+  last_success_at: string | null;
+  last_error: string | null;
+}
+
+export interface StoredPushSubscription {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+function toPushSubscription(row: PushSubscriptionRow): StoredPushSubscription {
+  return {
+    id: row.id,
+    endpoint: row.endpoint,
+    p256dh: row.p256dh,
+    auth: row.auth,
+  };
+}
+
+export interface SavePushSubscriptionInput {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent: string | null;
+}
+
+/**
+ * Alta (o refresco) de la suscripción de un dispositivo. `endpoint` es la
+ * clave natural: si el mismo navegador se re-suscribe, se pisan las claves y
+ * se limpia el último error en vez de crear otra fila.
+ */
+export async function savePushSubscription(
+  input: SavePushSubscriptionInput,
+): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from('push_subscriptions')
+    .upsert(
+      {
+        endpoint: input.endpoint,
+        p256dh: input.p256dh,
+        auth: input.auth,
+        user_agent: input.userAgent,
+        last_error: null,
+      },
+      { onConflict: 'endpoint' },
+    );
+
+  if (error) fail('guardar suscripción push', error);
+}
+
+/** Baja de la suscripción de un dispositivo (el usuario apagó el switch). */
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from('push_subscriptions')
+    .delete()
+    .eq('endpoint', endpoint);
+
+  if (error) fail('eliminar suscripción push', error);
+}
+
+export async function listPushSubscriptions(): Promise<StoredPushSubscription[]> {
+  const { data, error } = await supabaseAdmin()
+    .from('push_subscriptions')
+    .select(PUSH_SUBSCRIPTION_COLUMNS)
+    .order('created_at', { ascending: true })
+    .returns<PushSubscriptionRow[]>();
+
+  if (error) fail('listar suscripciones push', error);
+  return (data ?? []).map(toPushSubscription);
+}
+
+export async function countPushSubscriptions(): Promise<number> {
+  const { count, error } = await supabaseAdmin()
+    .from('push_subscriptions')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) fail('contar suscripciones push', error);
+  return count ?? 0;
+}
+
+/** Marca el resultado del último envío a un endpoint. */
+export async function markPushSubscription(
+  endpoint: string,
+  patch: { lastSuccessAt?: string; lastError?: string | null },
+): Promise<void> {
+  const row: Partial<PushSubscriptionRow> = {};
+  if (patch.lastSuccessAt !== undefined) row.last_success_at = patch.lastSuccessAt;
+  if (patch.lastError !== undefined) row.last_error = patch.lastError;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await supabaseAdmin()
+    .from('push_subscriptions')
+    .update(row)
+    .eq('endpoint', endpoint);
+
+  if (error) fail('actualizar suscripción push', error);
+}
+
+// ---------------------------------------------------------------------------
 // Clientes — no hay tabla de clientes; se derivan de `appointments`
 // ---------------------------------------------------------------------------
 

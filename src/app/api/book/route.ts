@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { bookAppointment, getBarber, getService, getSettings } from '@/lib/db';
+import { notifyNewAppointment } from '@/lib/push';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -103,6 +104,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       { error: 'Ese horario ya fue reservado. Elegí otro.' },
       { status: 409 },
     );
+  }
+
+  // Aviso push al staff (best-effort). No hay flujo de WhatsApp acá: sin seña
+  // no pasa por el webhook de Mercado Pago.
+  try {
+    await notifyNewAppointment(result.appointment);
+  } catch (cause) {
+    console.error('[chivas] No se pudo enviar la notificación push del turno', cause);
   }
 
   return NextResponse.json({ appointment: result.appointment }, { status: 201 });

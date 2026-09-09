@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { updateAppointmentPayment } from '@/lib/db';
 import { getPayment, verifyWebhookSignature } from '@/lib/mercadopago';
 import { enqueueDepositPaidNotification } from '@/lib/notifications';
+import { notifyNewAppointment } from '@/lib/push';
 import type { PaymentStatus } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       } catch (cause) {
         console.error(
           '[chivas] No se pudo encolar la notificación de WhatsApp del turno',
+          cause,
+        );
+      }
+
+      // Push a la PWA del staff (best-effort, sin cola). Independiente del
+      // aviso de WhatsApp: si uno falla, el otro sigue.
+      try {
+        await notifyNewAppointment(appointment);
+      } catch (cause) {
+        console.error(
+          '[chivas] No se pudo enviar la notificación push del turno',
           cause,
         );
       }
