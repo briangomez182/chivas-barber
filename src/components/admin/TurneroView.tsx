@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { Logo } from '@/components/layout/Logo';
-import { CompressIcon, ExpandIcon, XIcon } from '@/components/ui/icons';
+import { XIcon } from '@/components/ui/icons';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
@@ -17,7 +17,6 @@ import type { Appointment, TurneroBlock, TurneroSnapshot } from '@/lib/types';
 const POLL_MS = 10_000;
 /** Cuánto queda visible el cartel de "nuevo turno" antes de auto-ocultarse. */
 const ARRIVAL_TTL_MS = 25_000;
-const MUTED_KEY = 'turnero:muted';
 
 interface TurneroViewProps {
   role: 'admin' | 'editor';
@@ -169,9 +168,7 @@ export function TurneroView({
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [arrival, setArrival] = useState<Appointment | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [now, setNow] = useState<Date>(() => new Date());
-  const [muted, setMuted] = useState<boolean>(false);
   // Modal recordatorio: aparece en cada carga/recarga si el navegador tiene
   // el audio bloqueado por la política de autoplay (contexto `suspended`).
   const [needsSoundUnlock, setNeedsSoundUnlock] = useState<boolean>(false);
@@ -181,12 +178,10 @@ export function TurneroView({
   // Vista previa manual de la animación de avance de la agenda.
   const [previewShift, setPreviewShift] = useState<boolean>(false);
 
-  const rootRef = useRef<HTMLDivElement>(null);
   // `id -> status` del poll anterior: dispara el cartel cuando un turno pasa
   // a `confirmed` (pagó la seña), no sólo cuando aparece la fila.
   const prevStatus = useRef<Map<string, Appointment['status']>>(new Map());
   const primed = useRef<boolean>(false);
-  const mutedRef = useRef<boolean>(false);
 
   const serviceName = useCallback(
     (id: string | null): string =>
@@ -194,35 +189,12 @@ export function TurneroView({
     [services],
   );
 
-  // Preferencia de sonido (localStorage).
+  // Al entrar a la vista (montaje): si todavía no se confirmó el audio en esta
+  // pestaña, se muestra el modal para activarlo con un clic. Aparece tanto al
+  // recargar como al navegar desde "Mis turnos" — el navegador exige un gesto
+  // del usuario para poder reproducir audio.
   useEffect(() => {
-    try {
-      setMuted(localStorage.getItem(MUTED_KEY) === '1');
-    } catch {
-      /* private mode: se queda con el default */
-    }
-  }, []);
-  useEffect(() => {
-    mutedRef.current = muted;
-    try {
-      localStorage.setItem(MUTED_KEY, muted ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, [muted]);
-
-  // Al entrar a la vista (montaje): si el sonido no está silenciado y todavía
-  // no se confirmó en esta pestaña, se muestra el modal para activarlo con un
-  // clic. Aparece tanto al recargar como al navegar desde "Mis turnos" — el
-  // navegador exige un gesto del usuario para poder reproducir audio.
-  useEffect(() => {
-    let mutedPref = false;
-    try {
-      mutedPref = localStorage.getItem(MUTED_KEY) === '1';
-    } catch {
-      /* ignore */
-    }
-    if (!mutedPref && !soundArmed) setNeedsSoundUnlock(true);
+    if (!soundArmed) setNeedsSoundUnlock(true);
   }, []);
 
   const enableSound = useCallback((): void => {
@@ -235,7 +207,6 @@ export function TurneroView({
 
   // Suena la alerta; si el navegador la bloqueó, vuelve a pedir activarla.
   const beepOrPrompt = useCallback((): void => {
-    if (mutedRef.current) return;
     playBeep();
     if (isAudioBlocked()) {
       soundArmed = false;
@@ -247,22 +218,6 @@ export function TurneroView({
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // Estado de pantalla completa.
-  useEffect(() => {
-    const onChange = (): void =>
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  const toggleFullscreen = useCallback((): void => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else {
-      void rootRef.current?.requestFullscreen?.();
-    }
   }, []);
 
   const createTestTurn = useCallback(async (): Promise<void> => {
@@ -390,24 +345,8 @@ export function TurneroView({
     : baseBlocks;
 
   return (
-    <div ref={rootRef} className="min-h-dvh bg-gray-50 text-ink">
-      {/* En pantalla completa se oculta el header y queda sólo este botón
-          flotante para salir — experiencia inmersiva para la pantalla del
-          local. */}
-      {isFullscreen && (
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          aria-label="Salir de pantalla completa"
-          className="pill-outline fixed right-3 top-3 z-50 inline-flex items-center gap-1.5 bg-white/90 text-sm shadow-card backdrop-blur"
-        >
-          <CompressIcon className="h-4 w-4" />
-          Salir
-        </button>
-      )}
-
-      {!isFullscreen && (
-        <header className="border-b border-gray-100 bg-white">
+    <div className="min-h-dvh bg-gray-50 text-ink">
+      <header className="border-b border-gray-100 bg-white">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-4 max-[749px]:hidden">
             <Logo />
@@ -426,7 +365,7 @@ export function TurneroView({
             {/* En pantallas angostas (< 750px) se oculta todo este bloque de
                 controles y sólo queda visible el botón "Volver": el Turnero
                 se abre desde el celular sobre todo para salir rápido, no
-                para tocar sonido, animación o pantalla completa. */}
+                para ver la animación ni crear turnos de prueba. */}
             <div className="flex flex-wrap items-center gap-2 max-[749px]:hidden">
               <span className="hidden text-sm text-ink-soft lg:inline">
                 Hola, <strong className="font-semibold text-ink">{userName}</strong>
@@ -458,15 +397,6 @@ export function TurneroView({
 
               <button
                 type="button"
-                onClick={() => setMuted((current) => !current)}
-                aria-pressed={!muted}
-                className="pill-ghost text-sm"
-              >
-                {muted ? 'Sonido off' : 'Sonido on'}
-              </button>
-
-              <button
-                type="button"
                 onClick={previewAdvance}
                 disabled={previewShift || baseBlocks.length === 0}
                 className="pill-ghost text-sm disabled:opacity-40"
@@ -483,19 +413,6 @@ export function TurneroView({
               >
                 {creatingTest ? 'Creando…' : '🧪 Turno de prueba'}
               </button>
-
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                className="pill-outline inline-flex items-center gap-1.5 text-sm"
-              >
-                {isFullscreen ? (
-                  <CompressIcon className="h-4 w-4" />
-                ) : (
-                  <ExpandIcon className="h-4 w-4" />
-                )}
-                {isFullscreen ? 'Salir' : 'Pantalla completa'}
-              </button>
             </div>
 
             <Link
@@ -506,12 +423,9 @@ export function TurneroView({
             </Link>
           </div>
           </div>
-        </header>
-      )}
+      </header>
 
-      <main
-        className={`mx-auto max-w-3xl px-5 py-8 ${isFullscreen ? 'pt-16' : ''}`}
-      >
+      <main className="mx-auto max-w-3xl px-5 py-8">
         <AnimatePresence>
           {arrival && (
             <motion.div

@@ -8,23 +8,6 @@ import { motion } from 'framer-motion';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { api } from '@/lib/api-client';
 
-/**
- * TEMPORAL — botones para autocompletar credenciales mientras se prueba.
- * Quitar (o dejar la lista vacía) antes de considerarlo listo para producción.
- */
-const DEMO_ACCOUNTS: { label: string; email: string; password: string }[] = [
-  {
-    label: 'Admin',
-    email: 'chivasbarberias2454@gmail.com',
-    password: 'admin123',
-  },
-  {
-    label: 'Barbero',
-    email: 'barbero1@gmail.com',
-    password: 'Barbero1barbero1.',
-  },
-];
-
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,12 +18,6 @@ export function LoginForm() {
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-
-  const fillDemo = (account: (typeof DEMO_ACCOUNTS)[number]): void => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setError(null);
-  };
 
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
@@ -135,27 +112,6 @@ export function LoginForm() {
       >
         {loading ? 'Ingresando…' : 'Ingresar al panel'}
       </button>
-
-      {/* TEMPORAL — autocompletar credenciales de prueba. */}
-      {DEMO_ACCOUNTS.length > 0 && (
-        <div className="space-y-2 rounded-xl border border-dashed border-gray-300 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-ink-muted">
-            Acceso rápido (temporal)
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {DEMO_ACCOUNTS.map((account) => (
-              <button
-                key={account.email}
-                type="button"
-                onClick={() => fillDemo(account)}
-                className="pill-ghost text-xs"
-              >
-                {account.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </form>
   );
 }
