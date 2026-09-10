@@ -11,6 +11,15 @@ export type SlotInterval = (typeof SLOT_INTERVALS)[number];
 export const LOYALTY_STAMPS_GOALS = [5, 10, 15, 20] as const;
 export type LoyaltyStampsGoal = (typeof LOYALTY_STAMPS_GOALS)[number];
 
+/**
+ * Días habilitados para reservar por defecto (contando desde hoy), cuando un
+ * barbero todavía no tiene un valor propio o no hay barbero en contexto.
+ */
+export const DEFAULT_BOOKING_WINDOW_DAYS = 60;
+/** Rango admitido para `Barber.bookingWindowDays`. */
+export const MIN_BOOKING_WINDOW_DAYS = 1;
+export const MAX_BOOKING_WINDOW_DAYS = 365;
+
 export type AppointmentStatus =
   | 'pending'
   | 'pending_payment'
@@ -64,6 +73,13 @@ export interface Barber {
   slotIntervalMin: SlotInterval;
   /** Minutos de descanso entre un turno y el siguiente. */
   bufferMin: number;
+  /**
+   * Cantidad de días habilitados para reservar, contando hoy como día 1. Con
+   * `7`, un cliente puede sacar turno para hoy y los 6 días siguientes; el
+   * día 8 en adelante queda deshabilitado tanto en el calendario público como
+   * en el backend de reservas.
+   */
+  bookingWindowDays: number;
   /** Imágenes de portafolio (hasta 5). Se popula sólo cuando se pide explícitamente. */
   portfolioImages?: BarberPortfolioImage[];
 }

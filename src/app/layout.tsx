@@ -17,11 +17,13 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    title: BRAND.shortName,
+    // Nombre bajo el ícono al "Agregar a inicio" en iOS.
+    title: BRAND.name,
     statusBarStyle: 'black-translucent',
   },
   title: {
-    default: `${BRAND.name} — Barbería en Av. San Juan, CABA`,
+    // Título de la pestaña / nombre al guardar el sitio: solo la marca, sin dirección.
+    default: BRAND.name,
     template: `%s · ${BRAND.name}`,
   },
   description:

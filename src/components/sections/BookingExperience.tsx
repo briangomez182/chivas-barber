@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { BookingWidget } from '@/components/booking/BookingWidget';
 import { BarbersSection } from '@/components/sections/BarbersSection';
+import { ServicesSection } from '@/components/sections/ServicesSection';
 import type { Barber, Service, Settings } from '@/lib/types';
 
 interface BookingExperienceProps {
@@ -33,6 +34,7 @@ export function BookingExperience({
   return (
     <>
       <BarbersSection barbers={barbers} onSelect={selectAndScroll} />
+      <ServicesSection barbers={barbers} services={services} />
       <BookingWidget
         barbers={barbers}
         services={services}

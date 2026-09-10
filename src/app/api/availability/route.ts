@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
+import { lastBookableDate } from '@/lib/date';
 import { getBarber, getSettings, listAppointments, listScheduleBlocks } from '@/lib/db';
 import { buildSlots } from '@/lib/slots';
+import { DEFAULT_BOOKING_WINDOW_DAYS } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   const durationMin = Number.isFinite(durationParam) && durationParam > 0
     ? Math.round(durationParam)
     : schedule.slotIntervalMin;
+
+  // Fuera de la ventana de días habilitados del barbero no hay nada para
+  // reservar. El calendario público ya lo bloquea; esto cierra la puerta a
+  // pedir la fecha directo por la API.
+  const windowDays = barber?.bookingWindowDays ?? DEFAULT_BOOKING_WINDOW_DAYS;
+  if (date > lastBookableDate(windowDays)) {
+    return NextResponse.json({ date, barberId, durationMin, slots: [] });
+  }
 
   const appointments = await listAppointments({
     date,

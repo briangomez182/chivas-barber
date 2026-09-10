@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 
 import { deleteBarber, updateBarber, type BarberInput } from '@/lib/db';
-import { requireAdmin } from '@/lib/guard';
-import { SLOT_INTERVALS, type Barber, type SlotInterval } from '@/lib/types';
+import { requireAdmin, requireAdminOrEditor } from '@/lib/guard';
+import {
+  MAX_BOOKING_WINDOW_DAYS,
+  MIN_BOOKING_WINDOW_DAYS,
+  SLOT_INTERVALS,
+  type Barber,
+  type SlotInterval,
+} from '@/lib/types';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -69,33 +75,58 @@ function readSchedulePatch(
     patch.bufferMin = Math.round(value);
   }
 
+  if (body.bookingWindowDays !== undefined) {
+    const value = Number(body.bookingWindowDays);
+    if (
+      !Number.isInteger(value) ||
+      value < MIN_BOOKING_WINDOW_DAYS ||
+      value > MAX_BOOKING_WINDOW_DAYS
+    ) {
+      return {
+        error: `Los días habilitados deben estar entre ${MIN_BOOKING_WINDOW_DAYS} y ${MAX_BOOKING_WINDOW_DAYS}.`,
+      };
+    }
+    patch.bookingWindowDays = value;
+  }
+
   return { patch };
 }
 
-/** PATCH /api/barbers/:id — edición (admin). */
+/**
+ * PATCH /api/barbers/:id — edición.
+ *
+ * Admin: todos los campos. Editor (sólo su propia ficha): únicamente la
+ * agenda (horario, días, intervalo, descanso y ventana de reserva); no puede
+ * cambiar su nombre, rol, foto ni darse de baja.
+ */
 export async function PATCH(
   request: Request,
   context: RouteContext,
 ): Promise<NextResponse> {
-  const guard = await requireAdmin();
+  const { id } = await context.params;
+
+  const guard = await requireAdminOrEditor(id);
   if ('response' in guard) return guard.response;
 
-  const { id } = await context.params;
+  const isEditor = guard.session.role === 'editor';
+
   const body = (await request.json().catch(() => ({}))) as BarberPatch;
 
   const patch: Partial<BarberInput> = {};
 
-  if (typeof body.name === 'string' && body.name.trim()) {
-    patch.name = body.name.trim();
+  if (!isEditor) {
+    if (typeof body.name === 'string' && body.name.trim()) {
+      patch.name = body.name.trim();
+    }
+    if (typeof body.role === 'string') patch.role = body.role.trim();
+    if (typeof body.specialty === 'string') {
+      patch.specialty = body.specialty.trim();
+    }
+    if (typeof body.photoUrl === 'string') {
+      patch.photoUrl = body.photoUrl.trim();
+    }
+    if (typeof body.active === 'boolean') patch.active = body.active;
   }
-  if (typeof body.role === 'string') patch.role = body.role.trim();
-  if (typeof body.specialty === 'string') {
-    patch.specialty = body.specialty.trim();
-  }
-  if (typeof body.photoUrl === 'string') {
-    patch.photoUrl = body.photoUrl.trim();
-  }
-  if (typeof body.active === 'boolean') patch.active = body.active;
 
   const schedule = readSchedulePatch(body);
   if ('error' in schedule) {

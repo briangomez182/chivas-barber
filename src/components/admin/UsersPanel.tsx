@@ -102,12 +102,19 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
 
     try {
       if (draft.id) {
+        const currentUser = users.find((item) => item.id === draft.id);
+        const nextEmail = draft.email.trim().toLowerCase();
+        const emailChanged =
+          nextEmail.length > 0 &&
+          nextEmail !== (currentUser?.email ?? '').toLowerCase();
+
         const { user } = await api.users.update(draft.id, {
           name: draft.name,
           phone: draft.phone,
           role: draft.role,
           barberId: draft.role === 'editor' ? draft.barberId : null,
           ...(draft.password ? { password: draft.password } : {}),
+          ...(emailChanged ? { email: nextEmail } : {}),
         });
         setUsers((current) => current.map((item) => (item.id === user.id ? user : item)));
       } else {
@@ -247,12 +254,19 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
               />
             </Field>
 
-            <Field label="Email" htmlFor="user-email">
+            <Field
+              label="Email"
+              htmlFor="user-email"
+              hint={
+                draft.id
+                  ? 'Es el email con el que inicia sesión. Al cambiarlo, el acceso anterior deja de funcionar.'
+                  : undefined
+              }
+            >
               <input
                 id="user-email"
                 type="email"
                 required
-                disabled={draft.id !== null}
                 value={draft.email}
                 onChange={(event) => setDraft({ ...draft, email: event.target.value })}
               />

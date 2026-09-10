@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/SortableColumnHeader';
 import { Toast } from '@/components/ui/Toast';
 import { BarberPortfolioPanel } from '@/components/admin/BarberPortfolioPanel';
+import { BarberScheduleForm } from '@/components/admin/BarberScheduleForm';
+import { BarberServicesPanel } from '@/components/admin/BarberServicesPanel';
 import { api } from '@/lib/api-client';
 import { customerWhatsappLink, formatCustomerPhone } from '@/lib/brand';
 import {
@@ -29,6 +31,15 @@ import { compareSortValues } from '@/lib/sort';
 import type { Appointment, Barber, ScheduleBlock, Service, Settings } from '@/lib/types';
 
 type SortKey = 'date' | 'time' | 'customer' | 'service' | 'debt' | 'status';
+
+type EditorTab = 'turnos' | 'servicios' | 'agenda' | 'portafolio';
+
+const EDITOR_TABS: { id: EditorTab; label: string }[] = [
+  { id: 'turnos', label: 'Turnos' },
+  { id: 'servicios', label: 'Servicios' },
+  { id: 'agenda', label: 'Agenda' },
+  { id: 'portafolio', label: 'Portafolio' },
+];
 
 interface EditorTurnosPanelProps {
   editorName: string;
@@ -95,11 +106,21 @@ const EMPTY_BLOCK: BlockDraft = {
 
 export function EditorTurnosPanel({
   editorName,
-  barber,
-  services,
+  barber: initialBarber,
+  services: initialServices,
   settings,
 }: EditorTurnosPanelProps) {
   const router = useRouter();
+
+  const [tab, setTab] = useState<EditorTab>('turnos');
+  // El barbero y su carta cambian desde las pestañas Agenda y Servicios.
+  const [barber, setBarber] = useState<Barber>(initialBarber);
+  const [services, setServices] = useState<Service[]>(initialServices);
+
+  const reloadServices = useCallback(async (): Promise<void> => {
+    const { services: list } = await api.services.list(initialBarber.id);
+    setServices(list);
+  }, [initialBarber.id]);
 
   const [date, setDate] = useState<string>(todayIso());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -358,9 +379,40 @@ export function EditorTurnosPanel({
             </button>
           </div>
         </div>
+
+        <nav aria-label="Secciones" className="container-wide">
+          <ul className="flex gap-1 overflow-x-auto pb-3">
+            {EDITOR_TABS.map((item) => {
+              const active = item.id === tab;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      active ? 'text-white' : 'text-ink-soft hover:text-ink'
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="editor-tab"
+                        className="absolute inset-0 rounded-full bg-brand shadow-brand"
+                        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                      />
+                    )}
+                    <span className="relative">{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </header>
 
       <main className="container-wide py-12">
+        {tab === 'turnos' && (
+        <>
         <section aria-labelledby="editor-appointments-title">
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -725,24 +777,74 @@ export function EditorTurnosPanel({
               ))}
           </div>
         </section>
+        </>
+        )}
 
-        <section aria-labelledby="editor-portfolio-title" className="mt-12">
-          <header>
-            <h2
-              id="editor-portfolio-title"
-              className="text-xl font-extrabold tracking-[-0.02em] text-ink"
-            >
-              Mi portafolio
-            </h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              Estas fotos aparecen en la página principal cuando los clientes pasan el mouse sobre tu tarjeta.
-            </p>
-          </header>
+        {tab === 'servicios' && (
+          <section aria-labelledby="editor-services-title">
+            <header>
+              <h1
+                id="editor-services-title"
+                className="text-xl font-extrabold tracking-[-0.02em] text-ink"
+              >
+                Mis servicios
+              </h1>
+              <p className="mt-1 text-sm text-ink-soft">
+                Tu carta: nombre, descripción, duración y precio. Aparece en la
+                página principal y define los bloques de tu agenda.
+              </p>
+            </header>
 
-          <div className="card mt-5 p-6">
-            <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
-          </div>
-        </section>
+            <div className="card mt-5 p-6">
+              <BarberServicesPanel
+                barberId={barber.id}
+                barberName={barber.name}
+                onChanged={reloadServices}
+              />
+            </div>
+          </section>
+        )}
+
+        {tab === 'agenda' && (
+          <section aria-labelledby="editor-schedule-title">
+            <header>
+              <h1
+                id="editor-schedule-title"
+                className="text-xl font-extrabold tracking-[-0.02em] text-ink"
+              >
+                Mi agenda
+              </h1>
+              <p className="mt-1 text-sm text-ink-soft">
+                Horario de apertura y cierre, días que trabajás, intervalo entre
+                turnos y cuántos días para adelante te pueden reservar.
+              </p>
+            </header>
+
+            <div className="card mt-5 p-6">
+              <BarberScheduleForm barber={barber} onSaved={setBarber} />
+            </div>
+          </section>
+        )}
+
+        {tab === 'portafolio' && (
+          <section aria-labelledby="editor-portfolio-title">
+            <header>
+              <h1
+                id="editor-portfolio-title"
+                className="text-xl font-extrabold tracking-[-0.02em] text-ink"
+              >
+                Mi portafolio
+              </h1>
+              <p className="mt-1 text-sm text-ink-soft">
+                Estas fotos aparecen en la página principal cuando los clientes pasan el mouse sobre tu tarjeta.
+              </p>
+            </header>
+
+            <div className="card mt-5 p-6">
+              <BarberPortfolioPanel barberId={barber.id} barberName={barber.name} />
+            </div>
+          </section>
+        )}
       </main>
 
       <Modal

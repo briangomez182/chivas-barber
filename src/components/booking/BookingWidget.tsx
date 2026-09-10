@@ -8,8 +8,20 @@ import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import { WhatsAppPhoneInput, type WhatsAppPhoneValue } from '@/components/ui/WhatsAppPhoneInput';
 import { api } from '@/lib/api-client';
 import { whatsappLink } from '@/lib/brand';
-import { formatDuration, formatLongDate, formatPrice, todayIso } from '@/lib/date';
-import type { Barber, Service, Settings, Slot } from '@/lib/types';
+import {
+  formatDuration,
+  formatLongDate,
+  formatPrice,
+  lastBookableDate,
+  todayIso,
+} from '@/lib/date';
+import {
+  DEFAULT_BOOKING_WINDOW_DAYS,
+  type Barber,
+  type Service,
+  type Settings,
+  type Slot,
+} from '@/lib/types';
 
 import { Calendar } from './Calendar';
 import { DurationPills } from './DurationPills';
@@ -83,6 +95,9 @@ export function BookingWidget({
   // texto y el calendario iniciales.
   const schedule = selectedBarber ?? settings;
   const barberInterval = schedule.slotIntervalMin;
+  // Días hacia adelante habilitados para reservar (propio de cada barbero).
+  const bookingWindowDays =
+    selectedBarber?.bookingWindowDays ?? DEFAULT_BOOKING_WINDOW_DAYS;
 
   const loadSlots = useCallback(async (): Promise<void> => {
     if (!selectedBarberId) return;
@@ -113,6 +128,14 @@ export function BookingWidget({
   useEffect(() => {
     setTime(null);
   }, [date, selectedBarberId, durationMin]);
+
+  // Si el barbero elegido tiene una ventana de reserva más corta y la fecha
+  // seleccionada quedó fuera de ella, se vuelve a hoy.
+  useEffect(() => {
+    if (date > lastBookableDate(bookingWindowDays)) {
+      setDate(todayIso());
+    }
+  }, [date, bookingWindowDays]);
 
   // El servicio elegido pertenece a un barbero: al cambiar de barbero se
   // limpia y la duración vuelve al intervalo de la agenda de ese barbero.
@@ -328,6 +351,7 @@ export function BookingWidget({
               value={date}
               onChange={handleDateChange}
               workingDays={schedule.workingDays}
+              windowDays={bookingWindowDays}
             />
 
             {settings.depositEnabled && (

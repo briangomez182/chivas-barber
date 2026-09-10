@@ -5,7 +5,13 @@ import { useState } from 'react';
 import { Field } from '@/components/ui/Field';
 import { api } from '@/lib/api-client';
 import { WEEKDAY_LABELS } from '@/lib/date';
-import { SLOT_INTERVALS, type Barber, type SlotInterval } from '@/lib/types';
+import {
+  MAX_BOOKING_WINDOW_DAYS,
+  MIN_BOOKING_WINDOW_DAYS,
+  SLOT_INTERVALS,
+  type Barber,
+  type SlotInterval,
+} from '@/lib/types';
 
 interface BarberScheduleFormProps {
   barber: Barber;
@@ -19,6 +25,7 @@ interface Draft {
   workingDays: number[];
   slotIntervalMin: SlotInterval;
   bufferMin: number;
+  bookingWindowDays: number;
 }
 
 function toDraft(barber: Barber): Draft {
@@ -28,6 +35,7 @@ function toDraft(barber: Barber): Draft {
     workingDays: barber.workingDays,
     slotIntervalMin: barber.slotIntervalMin,
     bufferMin: barber.bufferMin,
+    bookingWindowDays: barber.bookingWindowDays,
   };
 }
 
@@ -64,6 +72,16 @@ export function BarberScheduleForm({ barber, onSaved }: BarberScheduleFormProps)
       setError('Elegí al menos un día laborable.');
       return;
     }
+    if (
+      !Number.isInteger(draft.bookingWindowDays) ||
+      draft.bookingWindowDays < MIN_BOOKING_WINDOW_DAYS ||
+      draft.bookingWindowDays > MAX_BOOKING_WINDOW_DAYS
+    ) {
+      setError(
+        `Los días habilitados para turnos deben estar entre ${MIN_BOOKING_WINDOW_DAYS} y ${MAX_BOOKING_WINDOW_DAYS}.`,
+      );
+      return;
+    }
 
     setBusy(true);
     try {
@@ -73,6 +91,7 @@ export function BarberScheduleForm({ barber, onSaved }: BarberScheduleFormProps)
         workingDays: draft.workingDays,
         slotIntervalMin: draft.slotIntervalMin,
         bufferMin: draft.bufferMin,
+        bookingWindowDays: draft.bookingWindowDays,
       });
       onSaved(saved);
       setDraft(toDraft(saved));
@@ -166,6 +185,27 @@ export function BarberScheduleForm({ barber, onSaved }: BarberScheduleFormProps)
           />
         </Field>
       </div>
+
+      <Field
+        label="Días habilitados para turnos"
+        htmlFor={`booking-window-${barber.id}`}
+        hint="Cuántos días hacia adelante se puede reservar, contando hoy. Con 7, nadie saca turno para el día 8."
+      >
+        <input
+          id={`booking-window-${barber.id}`}
+          type="number"
+          min={MIN_BOOKING_WINDOW_DAYS}
+          max={MAX_BOOKING_WINDOW_DAYS}
+          step={1}
+          value={draft.bookingWindowDays}
+          onChange={(event) =>
+            setDraft((prev) => ({
+              ...prev,
+              bookingWindowDays: Math.trunc(Number(event.target.value)) || 0,
+            }))
+          }
+        />
+      </Field>
 
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-ink-muted">

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { lastBookableDate } from '@/lib/date';
 import {
   bookAppointmentPending,
   getBarber,
@@ -77,6 +78,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(
       { error: 'El barbero seleccionado no está disponible' },
       { status: 409 },
+    );
+  }
+
+  if (date > lastBookableDate(barber.bookingWindowDays)) {
+    return NextResponse.json(
+      { error: 'Esa fecha todavía no está habilitada para reservar.' },
+      { status: 422 },
     );
   }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createService, getBarber, listServices } from '@/lib/db';
-import { requireAdmin } from '@/lib/guard';
+import { requireAdminOrEditor } from '@/lib/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +20,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   return NextResponse.json({ services });
 }
 
-/** POST /api/services — alta de servicio para un barbero (admin). */
+/** POST /api/services — alta de servicio: admin, o el propio barbero (editor). */
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = await requireAdmin();
-  if ('response' in guard) return guard.response;
-
   const body = (await request.json().catch(() => ({}))) as ServiceBody;
   const barberId = body.barberId?.trim() ?? '';
   const name = body.name?.trim() ?? '';
@@ -37,6 +34,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 400 },
     );
   }
+
+  const guard = await requireAdminOrEditor(barberId);
+  if ('response' in guard) return guard.response;
+
   const barber = await getBarber(barberId);
   if (!barber) {
     return NextResponse.json({ error: 'Barbero no encontrado' }, { status: 404 });

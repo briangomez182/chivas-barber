@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { lastBookableDate } from '@/lib/date';
 import { bookAppointment, getBarber, getService, getSettings } from '@/lib/db';
 import { notifyNewAppointment } from '@/lib/push';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
@@ -76,6 +77,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(
       { error: 'El barbero seleccionado no está disponible' },
       { status: 409 },
+    );
+  }
+
+  if (date > lastBookableDate(barber.bookingWindowDays)) {
+    return NextResponse.json(
+      { error: 'Esa fecha todavía no está habilitada para reservar.' },
+      { status: 422 },
     );
   }
 

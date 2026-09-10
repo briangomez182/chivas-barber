@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { deleteService, updateService, type ServiceInput } from '@/lib/db';
-import { requireAdmin } from '@/lib/guard';
+import { deleteService, getService, updateService, type ServiceInput } from '@/lib/db';
+import { requireAdminOrEditor } from '@/lib/guard';
 import type { Service } from '@/lib/types';
 
 interface RouteContext {
@@ -10,15 +10,21 @@ interface RouteContext {
 
 type ServicePatch = Partial<Omit<Service, 'id' | 'createdAt'>>;
 
-/** PATCH /api/services/:id (admin) */
+/** PATCH /api/services/:id — admin, o el barbero dueño del servicio (editor). */
 export async function PATCH(
   request: Request,
   context: RouteContext,
 ): Promise<NextResponse> {
-  const guard = await requireAdmin();
+  const { id } = await context.params;
+
+  const current = await getService(id);
+  if (!current) {
+    return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 });
+  }
+
+  const guard = await requireAdminOrEditor(current.barberId);
   if ('response' in guard) return guard.response;
 
-  const { id } = await context.params;
   const body = (await request.json().catch(() => ({}))) as ServicePatch;
 
   const patch: Partial<ServiceInput> = {};
@@ -45,15 +51,20 @@ export async function PATCH(
   return NextResponse.json({ service });
 }
 
-/** DELETE /api/services/:id (admin) */
+/** DELETE /api/services/:id — admin, o el barbero dueño del servicio (editor). */
 export async function DELETE(
   _request: Request,
   context: RouteContext,
 ): Promise<NextResponse> {
-  const guard = await requireAdmin();
-  if ('response' in guard) return guard.response;
-
   const { id } = await context.params;
+
+  const current = await getService(id);
+  if (!current) {
+    return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 });
+  }
+
+  const guard = await requireAdminOrEditor(current.barberId);
+  if ('response' in guard) return guard.response;
 
   const removed = await deleteService(id);
 

@@ -172,6 +172,9 @@ async function main() {
             working_days: b.schedule.workingDays,
             slot_interval_min: b.schedule.slotIntervalMin,
             buffer_min: b.schedule.bufferMin,
+            ...(b.schedule.bookingWindowDays !== undefined
+              ? { booking_window_days: b.schedule.bookingWindowDays }
+              : {}),
           }
         : {}),
       ...(b.createdAt ? { created_at: b.createdAt } : {}),
@@ -258,7 +261,7 @@ async function main() {
   if (adminCount > 0) {
     console.log('· Ya existe un admin, no se crea otro.');
   } else {
-    const email = process.env.ADMIN_EMAIL ?? 'admin@chivasbarber.club';
+    const email = process.env.ADMIN_EMAIL ?? 'chivasbarberias2454@gmail.com';
     const password = process.env.ADMIN_PASSWORD ?? 'admin123';
 
     const { data: created, error: createError } = await db.auth.admin.createUser({

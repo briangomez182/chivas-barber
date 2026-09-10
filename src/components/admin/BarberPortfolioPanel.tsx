@@ -100,6 +100,14 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
                 transition={{ duration: 0.25, delay: index * 0.04 }}
                 className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-gray-100 bg-gray-50"
               >
+                {/*
+                  Se usa <img> nativo a propósito (igual que BarberAvatar): las
+                  fotos de portafolio pueden venir de cualquier host —subidas al
+                  bucket de Supabase, pero también URLs externas cargadas a mano
+                  (ej. i.pinimg.com)— y `next/image` sólo renderiza hosts
+                  declarados en `images.remotePatterns`.
+                */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.imageUrl}
                   alt={`Foto ${index + 1} de ${barberName}`}

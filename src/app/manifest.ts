@@ -10,7 +10,8 @@ import { BRAND } from '@/lib/brand';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: BRAND.name,
-    short_name: BRAND.shortName,
+    // Nombre bajo el ícono al instalar la PWA en Android.
+    short_name: BRAND.name,
     description: BRAND.tagline,
     start_url: '/',
     scope: '/',

@@ -100,6 +100,19 @@ export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
+/**
+ * Última fecha (`YYYY-MM-DD`) para la que se pueden reservar turnos, dado un
+ * cupo de `windowDays` días habilitados contando hoy como día 1. Con
+ * `windowDays = 7` devuelve hoy + 6 días: el día 8 ya queda afuera.
+ */
+export function lastBookableDate(
+  windowDays: number,
+  from: string = todayIso(),
+): string {
+  const span = Number.isFinite(windowDays) ? Math.floor(windowDays) : 1;
+  return addDays(from, Math.max(1, span) - 1);
+}
+
 /** Celdas de un calendario mensual (semana arrancando en domingo). `null` = hueco. */
 export function monthGrid(year: number, month: number): (string | null)[] {
   const firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();

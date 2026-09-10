@@ -1,8 +1,8 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { siteUrl } from '@/lib/site-url';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +19,13 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * La respuesta es SIEMPRE la misma ("si el email tiene cuenta, te llega un
  * link"), exista o no la cuenta y falle o no el envío: así el endpoint no
- * sirve para averiguar qué emails están registrados. Doble rate limit —
- * por IP y por email— para que tampoco sirva para spamear casillas.
+ * sirve para averiguar qué emails están registrados. Doble rate limit —por
+ * IP y por email— para que tampoco sirva para spamear casillas.
+ *
+ * Cliente propio con `flowType: 'implicit'`: el mail se manda desde el
+ * servidor, así que el link no puede depender de un code verifier de PKCE
+ * guardado en el navegador del usuario. Con el flujo implícito el link trae
+ * los tokens en el hash y `/recuperar/nueva` los canjea sin verifier.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const ip = getClientIp(request);
@@ -45,7 +50,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     return genericOk;
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false, flowType: 'implicit' } },
+  );
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl()}/recuperar/nueva`,
   });

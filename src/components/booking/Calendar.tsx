@@ -6,26 +6,28 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   MONTH_LABELS,
   WEEKDAY_LABELS,
+  lastBookableDate,
   monthGrid,
   parseIsoDate,
   todayIso,
   weekdayOf,
 } from '@/lib/date';
+import { DEFAULT_BOOKING_WINDOW_DAYS } from '@/lib/types';
 
 interface CalendarProps {
   value: string;
   onChange: (date: string) => void;
   /** Días laborables (0 = domingo). */
   workingDays: number[];
-  /** Cuántos días hacia adelante se pueden reservar. */
-  horizonDays?: number;
+  /** Días habilitados para reservar, contando hoy como día 1. */
+  windowDays?: number;
 }
 
 export function Calendar({
   value,
   onChange,
   workingDays,
-  horizonDays = 60,
+  windowDays = DEFAULT_BOOKING_WINDOW_DAYS,
 }: CalendarProps) {
   const today = todayIso();
   const initial = parseIsoDate(value || today);
@@ -41,11 +43,10 @@ export function Calendar({
     [cursor],
   );
 
-  const maxDate = useMemo<string>(() => {
-    const { year, month, day } = parseIsoDate(today);
-    const limit = new Date(Date.UTC(year, month, day + horizonDays));
-    return limit.toISOString().slice(0, 10);
-  }, [today, horizonDays]);
+  const maxDate = useMemo<string>(
+    () => lastBookableDate(windowDays, today),
+    [today, windowDays],
+  );
 
   const move = (step: number): void => {
     setDirection(step);

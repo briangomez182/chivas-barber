@@ -4,7 +4,6 @@ import { SiteHeader } from '@/components/layout/SiteHeader';
 import { BookingExperience } from '@/components/sections/BookingExperience';
 import { LocationSection } from '@/components/sections/LocationSection';
 import { LoyaltySection } from '@/components/sections/LoyaltySection';
-import { ServicesSection } from '@/components/sections/ServicesSection';
 import { getSettings, listBarberPortfolioImages, listBarbers, listServices } from '@/lib/db';
 
 /** Los datos cambian con cada reserva: la home siempre se renderiza al vuelo. */
@@ -33,7 +32,6 @@ export default async function HomePage() {
 
       <main>
         <Hero />
-        <ServicesSection barbers={barbers} services={services} />
         <BookingExperience
           barbers={barbersWithPortfolio}
           services={services}

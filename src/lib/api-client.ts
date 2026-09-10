@@ -234,7 +234,10 @@ export const api = {
       }),
     update: (
       id: string,
-      data: Partial<Omit<Profile, 'id' | 'email' | 'createdAt'>> & { password?: string },
+      data: Partial<Omit<Profile, 'id' | 'email' | 'createdAt'>> & {
+        password?: string;
+        email?: string;
+      },
     ) =>
       apiFetch<{ user: Profile }>(`/api/users/${id}`, {
         method: 'PATCH',

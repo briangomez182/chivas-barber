@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { customerPhoneDigits } from './brand';
 import { supabaseAdmin } from './supabase/admin';
 import {
+  DEFAULT_BOOKING_WINDOW_DAYS,
   LOYALTY_STAMPS_GOALS,
   SLOT_INTERVALS,
   type Appointment,
@@ -65,6 +66,7 @@ interface BarberRow {
   working_days: number[];
   slot_interval_min: number;
   buffer_min: number;
+  booking_window_days: number;
   created_at: string;
 }
 
@@ -204,6 +206,7 @@ function toBarber(row: BarberRow): Barber {
       ? row.slot_interval_min
       : 30,
     bufferMin: row.buffer_min,
+    bookingWindowDays: row.booking_window_days ?? DEFAULT_BOOKING_WINDOW_DAYS,
     createdAt: row.created_at,
   };
 }
@@ -356,7 +359,7 @@ export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
 // ---------------------------------------------------------------------------
 
 const BARBER_COLUMNS =
-  'id, name, role, specialty, photo_url, active, opening_time, closing_time, working_days, slot_interval_min, buffer_min, created_at';
+  'id, name, role, specialty, photo_url, active, opening_time, closing_time, working_days, slot_interval_min, buffer_min, booking_window_days, created_at';
 
 export async function listBarbers(includeInactive = false): Promise<Barber[]> {
   let query = supabaseAdmin()
@@ -402,6 +405,7 @@ export interface BarberInput {
   workingDays?: number[];
   slotIntervalMin?: SlotInterval;
   bufferMin?: number;
+  bookingWindowDays?: number;
 }
 
 /** Traduce los campos de agenda de `BarberInput` a columnas snake_case. */
@@ -416,6 +420,9 @@ function scheduleColumns(
     row.slot_interval_min = patch.slotIntervalMin;
   }
   if (patch.bufferMin !== undefined) row.buffer_min = patch.bufferMin;
+  if (patch.bookingWindowDays !== undefined) {
+    row.booking_window_days = patch.bookingWindowDays;
+  }
   return row;
 }
 
@@ -1313,6 +1320,33 @@ export async function resetStaffPassword(
     fail('resetear contraseña', error);
   }
   return true;
+}
+
+export type UpdateStaffEmailResult =
+  | { ok: true }
+  | { error: 'EMAIL_TAKEN' | 'NOT_FOUND' };
+
+/**
+ * El admin le cambia el email de acceso a un usuario de staff. El email vive
+ * en `auth.users` (no en `profiles`), así que se toca con el Admin API.
+ * `email_confirm: true` porque lo cambia un admin — se aplica al toque, sin
+ * mail de confirmación.
+ */
+export async function updateStaffEmail(
+  id: string,
+  email: string,
+): Promise<UpdateStaffEmailResult> {
+  const { error } = await supabaseAdmin().auth.admin.updateUserById(id, {
+    email,
+    email_confirm: true,
+  });
+
+  if (error) {
+    if (error.code === 'email_exists') return { error: 'EMAIL_TAKEN' };
+    if (error.code === 'user_not_found') return { error: 'NOT_FOUND' };
+    fail('cambiar email de usuario', error);
+  }
+  return { ok: true };
 }
 
 /**

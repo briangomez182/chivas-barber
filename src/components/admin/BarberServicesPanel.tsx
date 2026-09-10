@@ -14,6 +14,8 @@ import { SLOT_INTERVALS, type Service } from '@/lib/types';
 interface BarberServicesPanelProps {
   barberId: string;
   barberName: string;
+  /** Se llama tras cada alta, edición o baja para que el contenedor recargue su copia. */
+  onChanged?: () => void;
 }
 
 interface DraftService {
@@ -38,7 +40,11 @@ const EMPTY_DRAFT: DraftService = {
  * su propia lista (nombre, descripción, duración y precio propios). Se
  * muestra dentro de la tarjeta del barbero en el panel de admin.
  */
-export function BarberServicesPanel({ barberId, barberName }: BarberServicesPanelProps) {
+export function BarberServicesPanel({
+  barberId,
+  barberName,
+  onChanged,
+}: BarberServicesPanelProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [draft, setDraft] = useState<DraftService | null>(null);
@@ -91,6 +97,7 @@ export function BarberServicesPanel({ barberId, barberName }: BarberServicesPane
         setServices((prev) => [...prev, service]);
       }
       setDraft(null);
+      onChanged?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar');
     } finally {
@@ -106,6 +113,7 @@ export function BarberServicesPanel({ barberId, barberName }: BarberServicesPane
       setServices((prev) => prev.filter((item) => item.id !== toDelete.id));
       setToast(`Servicio "${toDelete.name}" eliminado`);
       setToDelete(null);
+      onChanged?.();
     } finally {
       setDeleting(false);
     }

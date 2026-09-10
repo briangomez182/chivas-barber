@@ -2,6 +2,15 @@ import Link from 'next/link';
 
 import { BRAND, TEL_LINK, whatsappLink } from '@/lib/brand';
 
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
+const COMMIT_TIME = process.env.NEXT_PUBLIC_COMMIT_TIME ?? '';
+const COMMIT_DATE = process.env.NEXT_PUBLIC_COMMIT_DATE ?? '';
+const COMMIT_SHA = process.env.NEXT_PUBLIC_COMMIT_SHA ?? '';
+
+const versionLabel = `v${APP_VERSION}${COMMIT_TIME ? `-${COMMIT_TIME}` : ''}`;
+const versionTitle = [COMMIT_DATE, COMMIT_TIME].filter(Boolean).join(' ') +
+  (COMMIT_SHA ? ` · ${COMMIT_SHA}` : '');
+
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
@@ -57,8 +66,8 @@ export function SiteFooter() {
           </h2>
           <ul className="mt-4 space-y-2.5 text-sm">
             {[
-              { href: '#servicios', label: 'Servicios' },
               { href: '#barberos', label: 'Barberos' },
+              { href: '#servicios', label: 'Servicios' },
               { href: '#agenda', label: 'Reservar turno' },
             ].map((item) => (
               <li key={item.href}>
@@ -90,7 +99,15 @@ export function SiteFooter() {
               Términos y Condiciones
             </Link>
           </p>
-          <p>Lunes a sábado · 10:00 — 20:00</p>
+          <p className="flex items-center gap-3">
+            <span>Lunes a sábado · 10:00 — 20:00</span>
+            <span
+              title={versionTitle || undefined}
+              className="font-mono text-[0.7rem] text-ink-muted/70"
+            >
+              {versionLabel}
+            </span>
+          </p>
         </div>
       </div>
     </footer>

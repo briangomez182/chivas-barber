@@ -12,8 +12,8 @@ interface NavLink {
 }
 
 const NAV_LINKS: NavLink[] = [
-  { href: '#servicios', label: 'Servicios' },
   { href: '#barberos', label: 'Barberos' },
+  { href: '#servicios', label: 'Servicios' },
   { href: '#agenda', label: 'Agenda' },
   { href: '#local', label: 'El local' },
 ];
