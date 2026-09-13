@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -45,6 +46,8 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
   const [draft, setDraft] = useState<DraftUser | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -137,15 +140,18 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
     }
   };
 
-  const remove = async (user: Profile): Promise<void> => {
-    const confirmed = window.confirm(`¿Eliminar a ${user.name}? Pierde el acceso al panel.`);
-    if (!confirmed) return;
+  const confirmRemove = async (): Promise<void> => {
+    if (!toDelete) return;
 
+    setDeleting(true);
     try {
-      await api.users.remove(user.id);
-      setUsers((current) => current.filter((item) => item.id !== user.id));
+      await api.users.remove(toDelete.id);
+      setUsers((current) => current.filter((item) => item.id !== toDelete.id));
+      setToDelete(null);
     } catch (cause) {
-      window.alert(cause instanceof Error ? cause.message : 'No se pudo eliminar');
+      setError(cause instanceof Error ? cause.message : 'No se pudo eliminar');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -167,6 +173,12 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
           + Nuevo usuario
         </button>
       </header>
+
+      {error && !draft && (
+        <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <div className="card mt-7 overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
@@ -225,7 +237,10 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => remove(user)}
+                      onClick={() => {
+                        setError(null);
+                        setToDelete(user);
+                      }}
                       className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50"
                     >
                       Eliminar
@@ -352,6 +367,15 @@ export function UsersPanel({ barbers }: UsersPanelProps) {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar usuario"
+        description={`¿Eliminar a ${toDelete?.name}? Pierde el acceso al panel.`}
+        busy={deleting}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
     </section>
   );
 }

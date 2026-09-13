@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { api } from '@/lib/api-client';
 import type { BarberPortfolioImage } from '@/lib/types';
 
@@ -19,6 +20,8 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
   const [loading, setLoading] = useState<boolean>(true);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<BarberPortfolioImage | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
@@ -58,15 +61,18 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
     }
   };
 
-  const handleRemove = async (image: BarberPortfolioImage): Promise<void> => {
-    const confirmed = window.confirm('¿Eliminar esta imagen del portafolio?');
-    if (!confirmed) return;
+  const confirmRemove = async (): Promise<void> => {
+    if (!toDelete) return;
 
+    setDeleting(true);
     try {
-      await api.barbers.portfolio.remove(barberId, image.id);
-      setImages((prev) => prev.filter((img) => img.id !== image.id));
+      await api.barbers.portfolio.remove(barberId, toDelete.id);
+      setImages((prev) => prev.filter((img) => img.id !== toDelete.id));
+      setToDelete(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo eliminar la imagen');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -125,7 +131,10 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
                 {/* Botón eliminar */}
                 <button
                   type="button"
-                  onClick={() => handleRemove(img)}
+                  onClick={() => {
+                    setError(null);
+                    setToDelete(img);
+                  }}
                   aria-label="Eliminar imagen"
                   className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100"
                 >
@@ -189,6 +198,15 @@ export function BarberPortfolioPanel({ barberId, barberName }: BarberPortfolioPa
           {error}
         </p>
       )}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title="Eliminar imagen"
+        description="¿Eliminar esta imagen del portafolio?"
+        busy={deleting}
+        onConfirm={confirmRemove}
+        onCancel={() => setToDelete(null)}
+      />
     </div>
   );
 }

@@ -39,18 +39,6 @@ function isPaidDeposit(appointment: Appointment): boolean {
   return appointment.amount != null && appointment.status === 'confirmed';
 }
 
-/** Bloque "Libre" de relleno: entra por abajo cuando el primero se va. */
-const FILLER_BLOCK: TurneroBlock = {
-  time: null,
-  endTime: null,
-  state: 'free',
-  appointment: null,
-  blockedReason: null,
-};
-
-/** Cuánto dura la vista previa de la animación de avance. */
-const PREVIEW_MS = 2600;
-
 /**
  * Clave estable por bloque para que `AnimatePresence` sepa cuál sale y cuál
  * entra cuando la agenda avanza (pasa la hora del primer turno).
@@ -175,8 +163,6 @@ export function TurneroView({
   // TEMPORAL: botón "Turno de prueba" (siempre visible para staff). Quitar
   // junto con /api/turnero/test cuando no se use más.
   const [creatingTest, setCreatingTest] = useState<boolean>(false);
-  // Vista previa manual de la animación de avance de la agenda.
-  const [previewShift, setPreviewShift] = useState<boolean>(false);
 
   // `id -> status` del poll anterior: dispara el cartel cuando un turno pasa
   // a `confirmed` (pagó la seña), no sólo cuando aparece la fila.
@@ -246,16 +232,6 @@ export function TurneroView({
     const timer = setTimeout(() => setArrival(null), ARRIVAL_TTL_MS);
     return () => clearTimeout(timer);
   }, [arrival]);
-
-  // Vista previa: saca el primer bloque unos segundos para mostrar la
-  // animación de avance (lo mismo que pasa solo cuando vence el primer turno).
-  const previewAdvance = useCallback((): void => {
-    setPreviewShift((current) => {
-      if (current) return current;
-      window.setTimeout(() => setPreviewShift(false), PREVIEW_MS);
-      return true;
-    });
-  }, []);
 
   // Poll cada POLL_MS. Se reinicia al cambiar de barbero.
   useEffect(() => {
@@ -337,12 +313,6 @@ export function TurneroView({
   const todayLabel = snapshot ? formatLongDate(snapshot.date) : '';
 
   const baseBlocks = snapshot?.blocks ?? [];
-  // Con la vista previa activa se descarta el primer bloque y entra un "Libre"
-  // por abajo — así se ve la animación de avance sin esperar a que venza el
-  // primer turno.
-  const displayBlocks = previewShift
-    ? [...baseBlocks.slice(1), FILLER_BLOCK]
-    : baseBlocks;
 
   return (
     <div className="min-h-dvh bg-gray-50 text-ink">
@@ -362,15 +332,17 @@ export function TurneroView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* En pantallas angostas (< 750px) se oculta todo este bloque de
-                controles y sólo queda visible el botón "Volver": el Turnero
-                se abre desde el celular sobre todo para salir rápido, no
-                para ver la animación ni crear turnos de prueba. */}
-            <div className="flex flex-wrap items-center gap-2 max-[749px]:hidden">
-              <span className="hidden text-sm text-ink-soft lg:inline">
-                Hola, <strong className="font-semibold text-ink">{userName}</strong>
-              </span>
+            <span className="max-w-[32vw] truncate text-sm text-ink-soft">
+              <span className="hidden sm:inline">Hola, </span>
+              <strong className="font-semibold text-ink">{userName}</strong>
+            </span>
 
+            {/* En pantallas angostas (< 750px) se oculta el resto de los
+                controles y sólo quedan visibles el nombre y el botón
+                "Volver": el Turnero se abre desde el celular sobre todo para
+                salir rápido, no para ver la animación ni crear turnos de
+                prueba. */}
+            <div className="flex flex-wrap items-center gap-2 max-[749px]:hidden">
               {role === 'admin' && barbers.length > 0 && (
                 <>
                   <label htmlFor="turnero-barber" className="sr-only">
@@ -394,15 +366,6 @@ export function TurneroView({
               <span className="tabular-nums text-sm font-semibold text-ink-soft">
                 {clock}
               </span>
-
-              <button
-                type="button"
-                onClick={previewAdvance}
-                disabled={previewShift || baseBlocks.length === 0}
-                className="pill-ghost text-sm disabled:opacity-40"
-              >
-                Ver animación
-              </button>
 
               {/* TEMPORAL: crear un turno de prueba con seña "paga". */}
               <button
@@ -503,7 +466,7 @@ export function TurneroView({
           <div className="relative overflow-hidden px-1 py-1">
             <ul className="flex flex-col gap-4">
               <AnimatePresence initial={false} mode="popLayout">
-                {displayBlocks.map((block, index) => (
+                {baseBlocks.map((block, index) => (
                   <motion.li
                     key={blockKey(block, index)}
                     layout

@@ -1,10 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { BarberAvatar } from '@/components/ui/BarberAvatar';
 import type { Barber, BarberPortfolioImage } from '@/lib/types';
+
+interface LightboxData {
+  images: BarberPortfolioImage[];
+  barberName: string;
+  index: number;
+}
 
 interface BarbersSectionProps {
   barbers: Barber[];
@@ -19,9 +26,10 @@ interface BarbersSectionProps {
 interface PortfolioCarouselProps {
   images: BarberPortfolioImage[];
   barberName: string;
+  onOpen: (index: number) => void;
 }
 
-function PortfolioCarousel({ images, barberName }: PortfolioCarouselProps) {
+function PortfolioCarousel({ images, barberName, onOpen }: PortfolioCarouselProps) {
   const [current, setCurrent] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -68,6 +76,10 @@ function PortfolioCarousel({ images, barberName }: PortfolioCarouselProps) {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(current);
+          }}
         />
       </AnimatePresence>
 
@@ -154,6 +166,119 @@ function ChevronRightIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lightbox a pantalla completa para ver las fotos del portafolio en grande
+// ---------------------------------------------------------------------------
+
+interface PortfolioLightboxProps {
+  data: LightboxData;
+  onClose: () => void;
+}
+
+function PortfolioLightbox({ data, onClose }: PortfolioLightboxProps) {
+  const { images, barberName } = data;
+  const [current, setCurrent] = useState(data.index);
+  const total = images.length;
+
+  const go = useCallback(
+    (direction: 1 | -1) => {
+      setCurrent((prev) => (prev + direction + total) % total);
+    },
+    [total],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') go(-1);
+      if (e.key === 'ArrowRight') go(1);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [go, onClose]);
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+      >
+        <CloseIcon />
+      </button>
+
+      <AnimatePresence initial={false} mode="wait">
+        <motion.img
+          key={images[current].id}
+          src={images[current].imageUrl}
+          alt={`Trabajo de ${barberName} — foto ${current + 1}`}
+          className="max-h-[85vh] max-w-[92vw] rounded-2xl object-contain shadow-2xl"
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </AnimatePresence>
+
+      {total > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Foto anterior"
+            onClick={(e) => {
+              e.stopPropagation();
+              go(-1);
+            }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70 sm:left-6"
+          >
+            <ChevronLeftIcon />
+          </button>
+          <button
+            type="button"
+            aria-label="Foto siguiente"
+            onClick={(e) => {
+              e.stopPropagation();
+              go(1);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70 sm:right-6"
+          >
+            <ChevronRightIcon />
+          </button>
+          <span className="absolute bottom-6 left-0 right-0 text-center text-xs font-bold text-white/90">
+            {current + 1}/{total}
+          </span>
+        </>
+      )}
+    </motion.div>,
+    document.body,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tarjeta de barbero con carrusel hover
 // ---------------------------------------------------------------------------
@@ -162,9 +287,10 @@ interface BarberCardProps {
   barber: Barber;
   index: number;
   onSelect: (id: string) => void;
+  onOpenPortfolio: (images: BarberPortfolioImage[], barberName: string, index: number) => void;
 }
 
-function BarberCard({ barber, index, onSelect }: BarberCardProps) {
+function BarberCard({ barber, index, onSelect, onOpenPortfolio }: BarberCardProps) {
   const [hovered, setHovered] = useState<boolean>(false);
   const images = barber.portfolioImages ?? [];
   const hasImages = images.length > 0;
@@ -195,7 +321,11 @@ function BarberCard({ barber, index, onSelect }: BarberCardProps) {
             transition={{ duration: 0.25 }}
             className="absolute inset-0 z-10"
           >
-            <PortfolioCarousel images={images} barberName={barber.name} />
+            <PortfolioCarousel
+              images={images}
+              barberName={barber.name}
+              onOpen={(photoIndex) => onOpenPortfolio(images, barber.name, photoIndex)}
+            />
 
             {/* Botón de reserva sobre el overlay */}
             <div className="absolute inset-x-4 bottom-4 z-20">
@@ -264,6 +394,8 @@ function PhotoIcon() {
 // ---------------------------------------------------------------------------
 
 export function BarbersSection({ barbers, onSelect }: BarbersSectionProps) {
+  const [lightbox, setLightbox] = useState<LightboxData | null>(null);
+
   return (
     <section
       id="barberos"
@@ -289,6 +421,9 @@ export function BarbersSection({ barbers, onSelect }: BarbersSectionProps) {
               barber={barber}
               index={index}
               onSelect={onSelect}
+              onOpenPortfolio={(images, barberName, photoIndex) =>
+                setLightbox({ images, barberName, index: photoIndex })
+              }
             />
           ))}
         </div>
@@ -299,6 +434,12 @@ export function BarbersSection({ barbers, onSelect }: BarbersSectionProps) {
           </p>
         )}
       </div>
+
+      <AnimatePresence>
+        {lightbox && (
+          <PortfolioLightbox data={lightbox} onClose={() => setLightbox(null)} />
+        )}
+      </AnimatePresence>
     </section>
   );
 }

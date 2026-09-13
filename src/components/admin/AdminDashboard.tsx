@@ -73,7 +73,7 @@ export function AdminDashboard({
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/85 backdrop-blur-xl">
-        <div className="container-wide flex h-[72px] items-center justify-between gap-6">
+        <div className="container-wide flex min-h-[72px] flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
           <div className="flex items-center gap-5">
             <Logo />
             <span className="hidden rounded-full bg-ink px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white sm:inline-block">
@@ -82,16 +82,14 @@ export function AdminDashboard({
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-ink-soft sm:inline">
-              Hola, <strong className="font-semibold text-ink">{adminName}</strong>
+            <span className="max-w-[45vw] truncate text-sm text-ink-soft sm:max-w-none">
+              <span className="hidden sm:inline">Hola, </span>
+              <strong className="font-semibold text-ink">{adminName}</strong>
             </span>
-            <Link href="/admin/turnero" className="pill-primary text-sm">
+            <Link href="/admin/turnero" className="pill-primary shrink-0 text-sm">
               Turnero
             </Link>
-            <Link href="/" className="pill-ghost text-sm">
-              Ver sitio
-            </Link>
-            <button type="button" onClick={logout} className="pill-outline text-sm">
+            <button type="button" onClick={logout} className="pill-outline shrink-0 text-sm">
               Salir
             </button>
           </div>
